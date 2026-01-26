@@ -1,0 +1,22 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Excluir Pedido{% endblock %}
+
+{% block content %}
+<h2>Excluir Pedido</h2>
+
+<div class="card p-3 mb-4">
+    <h5>Tem certeza que deseja excluir o pedido #{{ order.id }}?</h5>
+
+    <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-danger mt-3">
+            Confirmar Exclusão
+        </button>
+        <a href="{% url 'order_list' %}" class="btn btn-secondary mt-3">
+            Cancelar
+        </a>
+    </form>
+</div>
+{% endblock %}
+

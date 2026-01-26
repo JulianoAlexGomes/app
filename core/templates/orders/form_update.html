@@ -1,0 +1,142 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Editar Pedido{% endblock %}
+
+{% block content %}
+<h2>Pedido #{{ order.id }}</h2>
+<div class="card p-3 mb-3">
+        <label class="form-label">Cliente</label>
+        {{ form.client }}
+</div>
+
+<form method="post">
+{% csrf_token %}
+
+<!-- ================= ADICIONAR ITEM ================= -->
+<div class="card p-3 mb-4">
+    <h5>Adicionar Item</h5>
+
+    <div class="row align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Produto</label>
+            <select id="product" class="form-control">
+                <option value="">---</option>
+                {% for p in products %}
+                <option value="{{ p.id }}"
+                        data-price="{{ p.price }}"
+                        data-price1="{{ p.price1 }}">
+                    ({{ p.name }} - {{ p.model }} - {{ p.size }} | Estoque Disp: {{ p.stock_available }} | Res: {{ p.stock_reserved }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Tipo Preço</label>
+            <select id="price_type" class="form-control">
+                <option value="price">Varejo</option>
+                <option value="price1">Atacado</option>
+            </select>
+        </div>
+
+        <div class="col-md-1">
+            <label class="form-label">Qtd</label>
+            <input type="number" id="quantity" class="form-control" value="1">
+        </div>
+
+        <div class="col-md-1">
+            <label class="form-label">Preço</label>
+            <input type="number" step="0.01" id="price" class="form-control">
+        </div>
+
+        <div class="col-md-1">
+            <label class="form-label">Desc.</label>
+            <input type="number" step="0.01" id="discount" class="form-control" value="0">
+        </div>
+
+        <div class="col-md-1">
+            <label class="form-label">Acrés.</label>
+            <input type="number" step="0.01" id="addition" class="form-control" value="0">
+        </div>
+
+        <div class="col-md-2">
+            <button type="button" id="add-item-btn" class="btn btn-success w-100">
+                Adicionar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= GRID ================= -->
+<div class="card p-3 mb-4">
+    <h5>Itens</h5>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Produto</th>
+                <th>Qtd</th>
+                <th>Preço</th>
+                <th>Desc.</th>
+                <th>Acrés.</th>
+                <th>Subtotal</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="items-table">
+            {% for form in formset %}
+            <tr>
+                <td>{{ form.instance.product }}</td>
+                <td>{{ form.quantity.value }}</td>
+                <td>{{ form.price.value }}</td>
+                <td>{{ form.discount.value }}</td>
+                <td>{{ form.addition.value }}</td>
+                <td>
+                    R$ {{ form.instance.subtotal|default:0|floatformat:2 }}
+                </td>
+                <td>
+                    {{ form.id }}
+                    {{ form.DELETE }}
+                    <button type="button"
+                            class="btn btn-danger btn-sm"
+                            onclick="
+                                this.closest('tr').style.display='none';
+                                document.getElementById('{{ form.DELETE.id_for_label }}').checked = true;
+                            ">
+                        ✕
+                    </button>
+            </tr>
+            <!-- Hidden inputs for existing item data to ensure POST submission -->
+            <div style="display: none;">
+                <input type="hidden" name="items-{{ forloop.counter0 }}-product" value="{{ form.instance.product.id }}">
+                <input type="hidden" name="items-{{ forloop.counter0 }}-quantity" value="{{ form.quantity.value }}">
+                <input type="hidden" name="items-{{ forloop.counter0 }}-price" value="{{ form.price.value }}">
+                <input type="hidden" name="items-{{ forloop.counter0 }}-discount" value="{{ form.discount.value }}">
+                <input type="hidden" name="items-{{ forloop.counter0 }}-addition" value="{{ form.addition.value }}">
+            </div>
+            {% endfor %}
+            </tbody>
+    </table>
+
+    <h5 class="text-end">
+        Total: <span id="total">R$ {{ order.total_amount|floatformat:2 }}</span>
+    </h5>
+</div>
+
+<!-- ================= FORMSET OCULTO ================= -->
+<div style="display:none">
+    {{ formset.management_form }}
+    <div id="formset-container"></div>
+</div>
+
+<button class="btn btn-primary">
+    Salvar Pedido
+</button>
+
+</form>
+
+{% include 'orders/status_block.html' %}
+
+<script src="{% static 'js/order_form.js' %}"></script>
+{% endblock %}

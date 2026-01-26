@@ -1,0 +1,110 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Novo Produto{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Novo Produto</h2>
+
+<form method="post" class="card p-4 shadow-sm">
+    {% csrf_token %}
+
+    <!-- Nome -->
+    <div class="mb-3">
+        <label class="form-label">Nome</label>
+        {{ form.name }}
+    </div>
+
+    <!-- Descrição -->
+    <div class="mb-3">
+        <label class="form-label">Descrição</label>
+        {{ form.description }}
+    </div>
+
+   <!-- Preços -->
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Preço Varejo</label>
+            {{ form.price }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Preço Atacado</label>
+            {{ form.price1 }}
+        </div>
+    </div>
+
+    <!-- Estoque e EAN13 -->
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Quantidade em Estoque</label>
+            {{ form.storage }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label class="form-label">EAN13</label>
+            {{ form.ean13 }}
+        </div>
+    </div>
+
+    <!-- Custo -->
+    <div class="mb-3">
+        <label class="form-label">Custo</label>
+        {{ form.cost }}
+    </div>
+
+    <!-- Linha com Modelo, Tamanho e Cor -->
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label class="form-label">Modelo</label>
+            {{ form.model }}
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <label class="form-label">Tamanho</label>
+            {{ form.size }}
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <label class="form-label">Cor</label>
+            {{ form.color }}
+        </div>
+    </div>
+
+    <!-- Linha com Peso e Marca -->
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Peso</label>
+            {{ form.weight }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Marca</label>
+            {{ form.brand }}
+        </div>
+    </div>
+
+    <!-- EAN13 -->
+    <div class="mb-3">
+        <label class="form-label">EAN13</label>
+        {{ form.ean13 }}
+    </div>
+
+    <!-- Inclusão de Imagem -->
+    {% comment %} <div class="mb-3">
+        <label class="form-label">Imagem do Produto</label>
+        {{ form.image }}
+    </div> {% endcomment %}
+
+    <!-- Ações -->
+    <div class="d-flex justify-content-end mt-4">
+        <a href="{% url 'product_list' %}" class="btn btn-secondary me-2">
+            Cancelar
+        </a>
+        <button type="submit" class="btn btn-primary">
+            Salvar
+        </button>
+    </div>
+</form>
+
+{% endblock %}

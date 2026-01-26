@@ -1,0 +1,36 @@
+<div class="card p-3 mb-4">
+    <h5>Status do Pedido</h5>
+
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <strong>Status atual:</strong>
+            {{ order.get_status_display }}
+        </div>
+
+        <div class="col-md-6 text-end">
+            <div class="d-inline-flex gap-2">
+
+                {% if order.next_status %}
+                <form method="post"
+                      action="{% url 'order_advance_status' order.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        Avançar Etapa
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if order.status != 'CANCELADO' %}
+                <form method="post"
+                      action="{% url 'order_cancel' order.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        Cancelar Pedido
+                    </button>
+                </form>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>

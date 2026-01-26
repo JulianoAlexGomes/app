@@ -1,0 +1,47 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Pedidos{% endblock %}
+
+{% block content %}
+
+<h2>Pedidos</h2>
+
+<a href="{% url 'order_create' %}" class="btn btn-success mb-3">
+    Novo Pedido
+</a>
+
+<div class="card p-3">
+    <table class="table table-striped mt-2">
+        <thead>
+            <tr>
+                <th>Pedido</th>
+                <th>Cliente</th>
+                <th>Total</th>
+                <th>Data</th>
+                <th class="text-end">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.id }}</td>
+                <td>{{ order.client|default:"—" }}</td>
+                <td>R$ {{ order.total_amount }}</td>
+                <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                <td class="text-end">
+                    <a href="{% url 'order_update' order.id %}" class="btn btn-sm btn-warning">Editar</a>
+                    <a href="{% url 'order_delete' order.id %}" class="btn btn-sm btn-danger">Excluir</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center text-muted">
+                    Nenhum pedido encontrado
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

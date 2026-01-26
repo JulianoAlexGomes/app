@@ -1,0 +1,82 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Movimentação de Estoque{% endblock %}
+
+{% block content %}
+
+<h2>{{ product.name }}</h2>
+
+<p>
+    Estoque atual:
+    <span class="badge bg-primary">{{ product.stock_available }}</span>
+</p>
+
+<hr>
+
+<div class="card p-3 mb-4">
+    <h5>Nova movimentação</h5>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Tipo</label>
+                {{ form.entry_type }}
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Quantidade</label>
+                {{ form.quantity }}
+            </div>
+        </div>
+
+        <button class="btn btn-success">
+            Registrar
+        </button>
+    </form>
+</div>
+
+<div class="card p-3">
+    <h5>Histórico</h5>
+
+    <table class="table table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Tipo</th>
+                <th>Qtd</th>
+                <th>Data</th>
+                <th width="60"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in movements %}
+            <tr>
+                <td>
+                    {% if mov.entry_type == 'in' %}
+                        <span class="badge bg-success">Entrada</span>
+                    {% else %}
+                        <span class="badge bg-danger">Saída</span>
+                    {% endif %}
+                </td>
+                <td>{{ mov.quantity }}</td>
+                <td>{{ mov.timestamp|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <form method="post" action="{% url 'stock_entry_delete' mov.id %}">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger">✕</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center text-muted">
+                    Nenhuma movimentação
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

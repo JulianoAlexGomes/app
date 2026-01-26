@@ -1,0 +1,44 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Novo Cliente{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-3">Novo Cliente</h2>
+
+<form method="post" class="card p-3 p-md-4 shadow-sm">
+    {% csrf_token %}
+
+    <div class="row g-3">
+        <div class="col-12">
+            <label class="form-label">Nome</label>
+            {{ form.name }}
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label">Email</label>
+            {{ form.email }}
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label">Telefone</label>
+            {{ form.phone }}
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label">Documento</label>
+            {{ form.document }}
+        </div>
+    </div>
+
+    <div class="d-flex flex-column flex-md-row justify-content-end gap-2 mt-4">
+        <a href="{% url 'client_list' %}" class="btn btn-secondary">
+            Cancelar
+        </a>
+        <button class="btn btn-primary">
+            Salvar
+        </button>
+    </div>
+</form>
+
+{% endblock %}
