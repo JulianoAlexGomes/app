@@ -82,32 +82,32 @@ WSGI_APPLICATION = 'api.wsgi.application'
 #     }
 # }
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'app',
-#         'USER': 'help',
-#         'PASSWORD': 'SenhaForte123!',
-#         'HOST': '31.97.164.192',
-#         'PORT': '3306',
-#         'OPTIONS': {
-#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-#         }
-#     }
-# }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'app',
-        'USER': 'root',
-        'PASSWORD': 'NovaSenhaForte123!',
-        'HOST': 'localhost',
+        'USER': 'help',
+        'PASSWORD': 'SenhaForte123!',
+        'HOST': '31.97.164.192',
         'PORT': '3306',
         'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         }
     }
 }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'app',
+#         'USER': 'root',
+#         'PASSWORD': 'NovaSenhaForte123!',
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         }
+#     }
+# }
 
 
 # Password validation
