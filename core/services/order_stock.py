@@ -3,77 +3,106 @@ from django.core.exceptions import ValidationError
 from core.models import OrderItem, StockEntry
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from core.models import StockEntry
+from core.models import StockEntry, ProductVariant, colorchart
+from django.db.models import Sum
+from core.models import generate_sku, generate_ean13 
+from django.core.exceptions import ValidationError
+from core.models import StockEntry, ProductVariant
 from django.db.models import Sum
 
-@transaction.atomic
-def reserve_stock(order):
-    for item in order.items.select_related('product'):
 
-        # 🔐 evita reserva duplicada
-        if StockEntry.objects.filter(
-            order_item=item,
-            movement_type=StockEntry.MovementType.RESERVE
-        ).exists():
+def reserve_stock(order):
+    for item in order.items.select_related('variant', 'variant__product'):
+        if item.reserved:
             continue
 
-        product = item.product
-        qty = item.quantity
+        available = item.variant.stock_available
 
-        if product.stock_available < qty:
+        if available < item.quantity:
             raise ValidationError(
-                f'Estoque insuficiente para {product.name}. '
-                f'Disponível: {product.stock_available}'
+                f'Estoque insuficiente para {item.variant}. '
+                f'Disponível: {available}'
             )
 
         StockEntry.objects.create(
-            product=product,
+            variant=item.variant,  # ✅ agora é variant
             order_item=item,
-            entry_type='out',
+            entry_type=None,
             movement_type=StockEntry.MovementType.RESERVE,
-            quantity=qty
+            quantity=item.quantity
         )
 
-@transaction.atomic
+        item.reserved = True
+        item.save(update_fields=['reserved'])
+
+
 def release_stock(order):
-    for item in order.items.select_related('product'):
-
-        reserved = StockEntry.objects.filter(
-            order_item=item,
-            movement_type=StockEntry.MovementType.RESERVE
-        ).aggregate(total=Sum('quantity'))['total'] or 0
-
-        released = StockEntry.objects.filter(
-            order_item=item,
-            movement_type=StockEntry.MovementType.RELEASE
-        ).aggregate(total=Sum('quantity'))['total'] or 0
-
-        to_release = reserved - released
-
-        if to_release <= 0:
+    for item in order.items.select_related('variant', 'variant__product'):
+        if not item.reserved:
             continue
 
         StockEntry.objects.create(
-            product=item.product,
+            variant=item.variant,
             order_item=item,
-            entry_type='in',
+            entry_type=None,
             movement_type=StockEntry.MovementType.RELEASE,
-            quantity=to_release
+            quantity=item.quantity
         )
 
+        item.reserved = False
+        item.save(update_fields=['reserved'])
 
-@transaction.atomic
+
 def finalize_stock(order):
-    for item in order.items.select_related('product'):
+    for item in order.items.select_related('variant', 'variant__product'):
 
-        # libera reserva pendente
-        release_stock(order)
+        # 🔹 Se estava reservado, libera logicamente
+        if item.reserved:
+            StockEntry.objects.create(
+                variant=item.variant,
+                order_item=item,
+                entry_type=None,
+                movement_type=StockEntry.MovementType.RELEASE,
+                quantity=item.quantity
+            )
 
-        # saída definitiva
+            item.reserved = False
+            item.save(update_fields=['reserved'])
+
+        # 🔥 Saída física real
         StockEntry.objects.create(
-            product=item.product,
+            variant=item.variant,
             order_item=item,
             entry_type='out',
             movement_type=StockEntry.MovementType.SALE,
             quantity=item.quantity
         )
+
+def create_variants(product):
+
+    if not product.color:
+        return
+
+    sizes = product.size.sizes.all() if product.size else [None]
+
+    for size in sizes:
+
+        variant, created = ProductVariant.objects.get_or_create(
+            product=product,
+            size=size,
+            color=product.color
+        )
+
+        # 🔹 Se acabou de criar, gera SKU e EAN
+        if created:
+
+            # Primeiro salva para garantir ID
+            variant.save()
+
+            # Gera SKU
+            variant.sku = generate_sku(variant)
+            variant.save()
+
+            # Gera EAN13 (precisa do ID da variante)
+            variant.ean13 = generate_ean13(variant)
+            variant.save()

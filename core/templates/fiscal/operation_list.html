@@ -1,0 +1,121 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Operações Fiscais{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+.card-dashboard{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}
+.table thead th{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    background:#f8f9fa;
+}
+.btn-icon{
+    width:34px;
+    height:34px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #dee2e6;
+    background:#fff;
+    transition:.2s;
+}
+.btn-icon:hover{ transform:scale(1.05); }
+.btn-primary-icon{ background:#0d6efd;color:#fff;border:none; }
+.btn-danger-icon{ background:#dc3545;color:#fff;border:none; }
+</style>
+
+<div class="container mt-4">
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Operações Fiscais</h4>
+    <a href="{% url 'operation_create' %}" class="btn-icon btn-primary-icon">
+        <i class="bi bi-plus-lg"></i>
+    </a>
+</div>
+
+<!-- TABELA -->
+<div class="card card-dashboard">
+<div class="table-responsive">
+<table class="table align-middle mb-0">
+<thead>
+<tr>
+    <th>CFOP</th>
+    <th>Nome</th>
+    <th class="d-none d-md-table-cell">Modelo</th>
+    <th class="d-none d-md-table-cell">Grupo NCM</th>
+    <th>Status</th>
+    <th class="text-center" width="110">Ações</th>
+</tr>
+</thead>
+<tbody>
+
+{% for operation in object_list %}
+<tr>
+    <td>
+        <strong>{{ operation.cfop }}</strong>
+        <div class="d-md-none small text-muted">
+            {{ operation.get_model_display }} • {{ operation.ncm_group }}
+        </div>
+    </td>
+
+    <td>
+        {{ operation.name }}
+    </td>
+
+    <td class="d-none d-md-table-cell">
+        {{ operation.get_model_display }}
+    </td>
+
+    <td class="d-none d-md-table-cell">
+        {{ operation.ncm_group }}
+    </td>
+
+    <td>
+        {% if operation.active %}
+            <span class="badge bg-success">Ativo</span>
+        {% else %}
+            <span class="badge bg-secondary">Inativo</span>
+        {% endif %}
+    </td>
+
+    <td>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="{% url 'operation_update' operation.pk %}" class="btn-icon">
+                <i class="bi bi-pencil"></i>
+            </a>
+
+            <a href="{% url 'operation_delete' operation.pk %}"
+               class="btn-icon btn-danger-icon"
+               onclick="return confirm('Excluir operação?');">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr>
+
+{% empty %}
+<tr>
+    <td colspan="6" class="text-center text-muted py-4">
+        Nenhuma operação cadastrada
+    </td>
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+{% endblock %}

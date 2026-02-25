@@ -1,0 +1,56 @@
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Data</th>
+            <th>Parcela</th>
+            <th>Descrição</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th width="150">Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+
+        {% for m in movements %}
+            {% for parcel in m.parcels.all %}
+            <tr>
+                <td>{{ parcel.movement_id }}</td>
+                <td>{{ parcel.deadline|date:"d/m/Y" }}</td>
+                <td>{{ parcel.parcel }}</td>
+                <td>{{ m.description }}</td>
+
+                <td>
+                    R$ {{ parcel.value }}
+                </td>
+
+                <td>
+                    {% if parcel.payed %}
+                        <span class="badge bg-success">Pago</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">Aberto</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if not parcel.payed %}
+                        <a href="{% url 'parcel_pay' parcel.pk %}"
+                           class="btn btn-sm btn-success">
+                            Pagar
+                        </a>
+                    {% else %}
+                        <span class="badge bg-success">Pago</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">
+                    Nenhum lançamento encontrado
+                </td>
+            </tr>
+        {% endfor %}
+
+    </tbody>
+</table>

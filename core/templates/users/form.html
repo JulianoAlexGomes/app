@@ -1,0 +1,16 @@
+{% extends 'base/base.html' %}
+{% block title %}Novo Usuário{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Novo Usuário</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <button type="submit" class="btn btn-success">Salvar</button>
+        <a href="{% url 'user_list' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

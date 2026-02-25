@@ -1,0 +1,32 @@
+/* ===============================
+   🔒 BLOQUEIO DE PEDIDO
+================================= */
+
+.order-locked {
+    position: relative;
+}
+
+/* Desabilita interação */
+.order-locked input,
+.order-locked select,
+.order-locked textarea,
+.order-locked button {
+    pointer-events: none;
+}
+
+/* Aparência visual */
+.order-locked input,
+.order-locked select,
+.order-locked textarea {
+    background-color: #f5f5f5 !important;
+    opacity: 0.8;
+}
+
+.order-locked .btn {
+    opacity: 0.6;
+}
+
+/* Permitir scroll e visualização */
+.order-locked table {
+    pointer-events: auto;
+}

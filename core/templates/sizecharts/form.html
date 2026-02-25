@@ -1,30 +1,144 @@
 {% extends 'base/base.html' %}
+{% load static %}
 
-{% block title %}Novo Tamanho{% endblock %}
+{% block title %}
+    {% if edit %}Editar Grade{% else %}Nova Grade{% endif %}
+{% endblock %}
 
 {% block content %}
 
-<h2>Novo Tamanho</h2>
-<form method="post" class="card p-4 shadow-sm">
+<!-- 🔹 HEADER -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+    <h2 class="mb-0">
+        {% if edit %}Editar Grade{% else %}Nova Grade{% endif %}
+    </h2>
+
+    <a href="{% url 'sizechart_list' %}" class="btn btn-outline-secondary btn-sm">
+        ← Voltar
+    </a>
+</div>
+
+<form method="post" class="card shadow-sm">
     {% csrf_token %}
 
-    <div class="mb-3">
-        <label class="form-label">Nome</label>
-        {{ form.name }}
+    <div class="card-body">
+
+        <!-- 📦 DADOS DA GRADE -->
+        <h5 class="mb-3">Dados da Grade</h5>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <label class="form-label mb-1">Nome</label>
+                {{ form.name }}
+            </div>
+
+            <div class="col-12">
+                <label class="form-label mb-1">Descrição</label>
+                {{ form.description }}
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 📏 TAMANHOS -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Tamanhos</h5>
+
+            <div class="d-flex gap-2">
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        id="auto-sizes">
+                    Auto P / M / G
+                </button>
+
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        id="add-size">
+                    + Incluir
+                </button>
+            </div>
+        </div>
+
+        <!-- Cabeçalho visual -->
+        <div class="row text-muted small mb-1 px-2">
+            <div class="col-md-6">Nome</div>
+            <div class="col-md-2">Ordem</div>
+            <div class="col-md-4 text-end">Ações</div>
+        </div>
+
+        {{ formset.management_form }}
+
+        <!-- Lista de tamanhos -->
+        <div class="vstack gap-2" id="sizes-container">
+            {% for size_form in formset %}
+                <div class="size-form border rounded px-3 py-2 bg-white">
+
+                    {{ size_form.id }}
+
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-6">
+                            {{ size_form.name }}
+                        </div>
+
+                        <div class="col-md-2">
+                            {{ size_form.order }}
+                        </div>
+
+                        <div class="col-md-4 text-end">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger remove-size">
+                                🗑 Remover
+                            </button>
+                            {{ size_form.DELETE }}
+                        </div>
+                    </div>
+
+                </div>
+            {% endfor %}
+        </div>
+
     </div>
 
-    <div class="mb-3">
-        <label class="form-label">Descrição</label>
-        {{ form.description }}
-    </div>
-    <div class="d-flex justify-content-end">
-        <a href="{% url 'sizechart_list' %}" class="btn btn-secondary me-2">
+    <!-- 🔹 FOOTER -->
+    <div class="card-footer bg-light d-flex justify-content-end gap-2">
+        <a href="{% url 'sizechart_list' %}" class="btn btn-outline-secondary btn-sm">
             Cancelar
         </a>
-        <button class="btn btn-primary">
-            Salvar
+        <button class="btn btn-success btn-sm">
+            💾 Salvar
         </button>
     </div>
 </form>
+
+<!-- 🔁 TEMPLATE OCULTO PARA CLONAR -->
+<template id="empty-form-template">
+    <div class="size-form border rounded px-3 py-2 bg-white">
+
+        {{ formset.empty_form.id }}
+
+        <div class="row g-2 align-items-center">
+            <div class="col-md-6">
+                {{ formset.empty_form.name }}
+            </div>
+
+            <div class="col-md-2">
+                {{ formset.empty_form.order }}
+            </div>
+
+            <div class="col-md-4 text-end">
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger remove-size">
+                    🗑 Remover
+                </button>
+                {{ formset.empty_form.DELETE }}
+            </div>
+        </div>
+
+    </div>
+</template>
+
+{% block extra_js %}
+<script src="{% static 'js/sizechart_form.js' %}"></script>
+{% endblock %}
 
 {% endblock %}

@@ -1,0 +1,324 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Empresa{% endblock %}
+
+{% block content %}
+
+<script src="{% static 'js/business_form.js' %}"></script>
+
+<style>
+.card-dashboard{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}
+
+.btn-icon{
+    width:36px;
+    height:36px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #dee2e6;
+    background:#fff;
+    transition:.2s;
+}
+
+.btn-icon:hover{
+    transform:scale(1.05);
+}
+
+.nav-tabs .nav-link{
+    border:none;
+    border-radius:8px;
+    margin-right:6px;
+    font-size:13px;
+}
+
+.nav-tabs .nav-link.active{
+    background:#0d6efd;
+    color:#fff;
+}
+</style>
+
+<div class="container mt-4">
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">
+        {{ view.object|default:"Nova Empresa" }}
+    </h4>
+    <a href="{% url 'business_list' %}" class="btn btn-outline-secondary btn-icon">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+{% csrf_token %}
+
+{% if form.errors %}
+<div class="alert alert-danger">
+    <strong>Erro ao salvar:</strong>
+    <ul class="mb-0">
+        {% for field in form %}
+            {% for error in field.errors %}
+                <li>{{ field.label }}: {{ error }}</li>
+            {% endfor %}
+        {% endfor %}
+        {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- ABAS -->
+<ul class="nav nav-tabs mb-4" id="businessTab" role="tablist">
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link active"
+                data-bs-toggle="tab"
+                data-bs-target="#dados">
+            Dados Empresa
+        </button>
+    </li>
+
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#endereco">
+            Endereço
+        </button>
+    </li>
+
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#fiscal">
+            Configuração Fiscal
+        </button>
+    </li>
+
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#certificado">
+            Certificado
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+<!-- ================= DADOS ================= -->
+<div class="tab-pane fade show active" id="dados">
+    <div class="card card-dashboard mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.name.label }}</label>
+                    {{ form.name }}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.fantasy_name.label }}</label>
+                    {{ form.fantasy_name }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.document.label }}</label>
+                    <div class="input-group">
+                        {{ form.document }}
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-icon"
+                                id="btn-search-cnpj">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.state_registration.label }}</label>
+                    {{ form.state_registration }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.municipal_registration.label }}</label>
+                    {{ form.municipal_registration }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.tax_regime.label }}</label>
+                    {{ form.tax_regime }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.nfe_environment.label }}</label>
+                    {{ form.nfe_environment }}
+                </div>
+
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check mt-3">
+                        {{ form.active }}
+                        <label class="form-check-label">
+                            {{ form.active.label }}
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= ENDEREÇO ================= -->
+<div class="tab-pane fade" id="endereco">
+    <div class="card card-dashboard mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.zip_code.label }}</label>
+                    <div class="input-group">
+                        {{ form.zip_code }}
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-icon"
+                                id="btn-search-cep">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-8">
+                    <label class="form-label">{{ form.street.label }}</label>
+                    {{ form.street }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.number.label }}</label>
+                    {{ form.number }}
+                </div>
+
+                <div class="col-md-5">
+                    <label class="form-label">{{ form.complement.label }}</label>
+                    {{ form.complement }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.district.label }}</label>
+                    {{ form.district }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.city.label }}</label>
+                    {{ form.city }}
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.state.label }}</label>
+                    {{ form.state }}
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.city_code.label }}</label>
+                    {{ form.city_code }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.phone.label }}</label>
+                    {{ form.phone }}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= FISCAL ================= -->
+<div class="tab-pane fade" id="fiscal">
+    <div class="card card-dashboard mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.nfe_series.label }}</label>
+                    {{ form.nfe_series }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.nfe_last_number.label }}</label>
+                    {{ form.nfe_last_number }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.nfce_series.label }}</label>
+                    {{ form.nfce_series }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.nfce_last_number.label }}</label>
+                    {{ form.nfce_last_number }}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.nfce_csc.label }}</label>
+                    {{ form.nfce_csc }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.nfce_csc_id.label }}</label>
+                    {{ form.nfce_csc_id }}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= CERTIFICADO ================= -->
+<div class="tab-pane fade" id="certificado">
+    <div class="card card-dashboard mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.certificate_file.label }}</label>
+                    {{ form.certificate_file }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.certificate_password.label }}</label>
+                    {{ form.certificate_password }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">{{ form.certificate_expiration.label }}</label>
+                    {{ form.certificate_expiration }}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- BOTÕES -->
+<div class="d-flex justify-content-end gap-2 mt-4">
+    <a href="{% url 'business_list' %}" class="btn btn-outline-secondary">
+        Cancelar
+    </a>
+    <button type="submit" class="btn btn-success">
+        💾 Salvar
+    </button>
+</div>
+
+</form>
+</div>
+
+{% endblock %}

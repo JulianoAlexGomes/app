@@ -1,110 +1,248 @@
 {% extends 'base/base.html' %}
-
-{% block title %}Novo Produto{% endblock %}
+{% load static %}
+{% block title %}Produto{% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Novo Produto</h2>
+<!-- 🔹 HEADER -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+    <h2 class="mb-0">
+        {% if form.instance.pk %}Editar Produto{% else %}Novo Produto{% endif %}
+    </h2>
 
-<form method="post" class="card p-4 shadow-sm">
+    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary">
+        ← Voltar
+    </a>
+</div>
+
+<!-- 📄 FORM PRODUTO -->
+<form method="post" class="card shadow-sm" enctype="multipart/form-data">
     {% csrf_token %}
 
-    <!-- Nome -->
-    <div class="mb-3">
-        <label class="form-label">Nome</label>
-        {{ form.name }}
+    <div class="card-body p-3 p-md-4">
+
+        <!-- 🏷️ DADOS BÁSICOS -->
+        <h6 class="text-muted mb-3">Dados do Produto</h6>
+
+        <div class="mb-3">
+            <label class="form-label">Nome</label>
+            {{ form.name }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Descrição</label>
+            {{ form.description }}
+        </div>
+
+        <!-- 🧾 IDENTIFICAÇÃO -->
+        <h6 class="text-muted mt-4 mb-3">Identificação</h6>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Modelo</label>
+                {{ form.model }}
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Grade</label>
+                {{ form.size }}
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Cor</label>
+                {{ form.color }}
+            </div>
+        </div>
+
+        {% if form.instance.size %}
+            <div class="mt-2">
+                <small class="text-muted">Tamanhos desta grade</small>
+                <div class="d-flex gap-2 flex-wrap mt-1">
+                    {% for s in form.instance.size.sizes.all %}
+                        <span class="badge bg-secondary">
+                            {{ s.name }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- 💰 PREÇOS -->
+        <h6 class="text-muted mt-4 mb-3">Preços</h6>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Custo</label>
+                {{ form.cost }}
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Preço Varejo</label>
+                {{ form.price }}
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Preço Atacado</label>
+                {{ form.price1 }}
+            </div>
+        </div>
+
+        <!-- ⚙️ DETALHES -->
+        <h6 class="text-muted mt-4 mb-3">Detalhes</h6>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Peso</label>
+                {{ form.weight }}
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Marca</label>
+                {{ form.brand }}
+            </div>
+            
+            <div class="col-md-4 position-relative">
+                <label class="form-label">NCM</label>
+
+                <input type="text"
+                    id="ncm-search"
+                    class="form-control"
+                    placeholder="Digite código do NCM..."
+                    autocomplete="off"
+                    value="{% if form.instance.ncm %}{{ form.instance.ncm.code }} - {{ form.instance.ncm.description }}{% endif %}">
+
+                <input type="hidden"
+                    name="ncm"
+                    id="ncm-id"
+                    value="{% if form.instance.ncm %}{{ form.instance.ncm.id }}{% endif %}">
+
+                <div id="ncm-results"
+                    class="list-group position-absolute w-100 shadow-sm"
+                    style="z-index:1050; display:none; max-height:300px; overflow-y:auto;">
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Descrição -->
-    <div class="mb-3">
-        <label class="form-label">Descrição</label>
-        {{ form.description }}
-    </div>
-
-   <!-- Preços -->
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Preço Varejo</label>
-            {{ form.price }}
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Preço Atacado</label>
-            {{ form.price1 }}
-        </div>
-    </div>
-
-    <!-- Estoque e EAN13 -->
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Quantidade em Estoque</label>
-            {{ form.storage }}
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label class="form-label">EAN13</label>
-            {{ form.ean13 }}
-        </div>
-    </div>
-
-    <!-- Custo -->
-    <div class="mb-3">
-        <label class="form-label">Custo</label>
-        {{ form.cost }}
-    </div>
-
-    <!-- Linha com Modelo, Tamanho e Cor -->
-    <div class="row">
-        <div class="col-md-4 mb-3">
-            <label class="form-label">Modelo</label>
-            {{ form.model }}
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <label class="form-label">Tamanho</label>
-            {{ form.size }}
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <label class="form-label">Cor</label>
-            {{ form.color }}
-        </div>
-    </div>
-
-    <!-- Linha com Peso e Marca -->
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Peso</label>
-            {{ form.weight }}
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Marca</label>
-            {{ form.brand }}
-        </div>
-    </div>
-
-    <!-- EAN13 -->
-    <div class="mb-3">
-        <label class="form-label">EAN13</label>
-        {{ form.ean13 }}
-    </div>
-
-    <!-- Inclusão de Imagem -->
-    {% comment %} <div class="mb-3">
-        <label class="form-label">Imagem do Produto</label>
-        {{ form.image }}
-    </div> {% endcomment %}
-
-    <!-- Ações -->
-    <div class="d-flex justify-content-end mt-4">
-        <a href="{% url 'product_list' %}" class="btn btn-secondary me-2">
+    <!-- 🔘 AÇÕES -->
+    <div class="card-footer bg-light d-flex justify-content-end gap-2">
+        <a href="{% url 'product_list' %}" class="btn btn-outline-secondary">
             Cancelar
         </a>
-        <button type="submit" class="btn btn-primary">
-            Salvar
+        <button class="btn btn-success">
+            💾 Salvar Produto
         </button>
     </div>
 </form>
+
+{% if form.instance.pk and form.instance.variants.exists %}
+<div class="card shadow-sm mt-4">
+    <div class="card-header">
+        <strong>Variações e Códigos</strong>
+    </div>
+    <div class="card-body">
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Tamanho</th>
+                        <th>Cor</th>
+                        <th>SKU</th>
+                        <th>EAN13</th>
+                        <th class="text-center">Disponível</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for variant in form.instance.variants.all %}
+                    <tr>
+                        <td>{{ variant.size }}</td>
+                        <td>{{ variant.color }}</td>
+                        <td>{{ variant.sku }}</td>
+                        <td>{{ variant.ean13 }}</td>
+                        <td class="text-center fw-semibold">
+                            {{ variant.stock_available }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+
+{% if form.instance.pk %}
+<!-- =========================
+    GALERIA DINÂMICA (AJAX)
+========================= -->
+<div class="card shadow-sm mt-4">
+    <div class="card-header">
+        <strong>Imagens do Produto</strong>
+    </div>
+
+    <div class="card-body">
+
+        <!-- Upload -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-5">
+                <input type="file" id="newImageInput" class="form-control">
+            </div>
+
+            <div class="col-md-3">
+                <input type="text" id="newImageDescription"
+                       placeholder="Descrição"
+                       class="form-control">
+            </div>
+
+            <div class="col-md-2">
+                <input type="number" id="newImageOrder"
+                       placeholder="Ordem"
+                       class="form-control">
+            </div>
+
+            <div class="col-md-2 d-grid">
+                <button type="button"
+                        id="uploadImageBtn"
+                        class="btn btn-primary">
+                    ➕ Adicionar
+                </button>
+            </div>
+        </div>
+
+        <!-- Galeria -->
+        <div class="row g-4" id="imageGallery">
+            <!-- As imagens serão carregadas via AJAX -->
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+
+<!-- 🔍 Modal Preview -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-dark">
+      <div class="modal-body text-center p-0">
+        <img id="modalPreviewImage"
+             src=""
+             class="img-fluid"
+             style="max-height:90vh;">
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+    window.NCM_SEARCH_URL = "{% url 'ajax_ncm_search' %}";
+</script>
+<script src="{% static 'js/product_ncm.js' %}"></script>
+<script src="{% static 'js/product_images.js' %}"></script>
+{% endblock %}
 
 {% endblock %}

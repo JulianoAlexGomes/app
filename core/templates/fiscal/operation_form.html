@@ -1,0 +1,137 @@
+{% extends 'base/base.html' %}
+{% block title %}
+    {% if object %}Editar Operação{% else %}Nova Operação{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h4>
+        {% if object %}
+            Editar Operação Fiscal
+        {% else %}
+            Nova Operação Fiscal
+        {% endif %}
+    </h4>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="card">
+            <div class="card-body">
+
+                <!-- DADOS PRINCIPAIS -->
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Nome</label>
+                        {{ form.name }}
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Modelo</label>
+                        {{ form.model }}
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">CFOP</label>
+                        {{ form.cfop }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Grupo NCM</label>
+                    {{ form.ncm_group }}
+                </div>
+
+                <hr>
+
+                <!-- ICMS -->
+                <h6 class="fw-bold">ICMS</h6>
+
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">CST</label>
+                        {{ form.icms_cst }}
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">CSOSN</label>
+                        {{ form.icms_csosn }}
+                    </div>
+
+                    <div class="col-md-3 form-check mt-4">
+                        {{ form.calculate_icms }}
+                        <label class="form-check-label">
+                            Calcular ICMS
+                        </label>
+                    </div>
+
+                    <div class="col-md-3 form-check mt-4">
+                        {{ form.use_origin_destination_table }}
+                        <label class="form-check-label">
+                            Usar tabela origem/destino
+                        </label>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- PIS -->
+                <h6 class="fw-bold">PIS</h6>
+
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">CST</label>
+                        {{ form.pis_cst }}
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Alíquota (%)</label>
+                        {{ form.pis_rate }}
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- COFINS -->
+                <h6 class="fw-bold">COFINS</h6>
+
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">CST</label>
+                        {{ form.cofins_cst }}
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Alíquota (%)</label>
+                        {{ form.cofins_rate }}
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="form-check">
+                    {{ form.active }}
+                    <label class="form-check-label">
+                        Ativa
+                    </label>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="mt-3 text-end">
+            <a href="{% url 'operation_list' %}" class="btn btn-secondary">
+                Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+                Salvar
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'base/base.html' %}
+{% block title %}{% if object %}Editar NCM{% else %}Novo NCM{% endif %}{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">
+        {% if object %}Editar NCM{% else %}Novo NCM{% endif %}
+    </h4>
+    <a href="{% url 'ncm_list' %}" class="btn btn-outline-secondary">
+        ← Voltar
+    </a>
+</div>
+
+<form method="post" class="card card-dashboard shadow-sm">
+    {% csrf_token %}
+
+    <div class="card-body">
+        <div class="row g-3">
+
+            <div class="col-md-4">
+                <label class="form-label">Código</label>
+                {{ form.code }}
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">CEST</label>
+                {{ form.cest }}
+            </div>
+
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                    {{ form.mono }}
+                    <label class="form-check-label ms-2">
+                        Monofásico
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Categoria</label>
+                {{ form.category }}
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Descrição</label>
+                {{ form.description }}
+            </div>
+
+        </div>
+    </div>
+
+    <div class="card-footer bg-light d-flex justify-content-end gap-2">
+        <a href="{% url 'ncm_list' %}" class="btn btn-outline-secondary">
+            Cancelar
+        </a>
+
+        <button class="btn btn-success">
+            💾 Salvar
+        </button>
+    </div>
+</form>
+
+</div>
+
+{% endblock %}

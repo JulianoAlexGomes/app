@@ -2,83 +2,384 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}SaaS{% endblock %}</title>
+<meta charset="UTF-8">
+<title>{% block title %}Sistema{% endblock %}</title>
 
-    <!-- Bootstrap 5 CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{% static 'js/responsive.js' %}"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+:root{
+    --sidebar-width:260px;
+    --sidebar-mini:80px;
+    --transition:.3s;
+}
+
+body{
+    background:#f4f6f9;
+    overflow-x:hidden;
+    transition:var(--transition);
+}
+
+body.dark-mode{
+    background:#0f172a;
+    color:#e2e8f0;
+}
+
+.wrapper{
+    display:flex;
+}
+
+#sidebar{
+    width:var(--sidebar-width);
+    min-height:100vh;
+    background:#111827;
+    color:#fff;
+    transition:var(--transition);
+    position:fixed;
+    overflow-y:auto;
+}
+
+#sidebar.sidebar-collapsed{
+    width:var(--sidebar-mini);
+}
+
+.sidebar-header{
+    padding:20px;
+    font-weight:600;
+    font-size:18px;
+    border-bottom:1px solid rgba(255,255,255,.05);
+}
+
+.sidebar-menu a{
+    display:flex;
+    align-items:center;
+    padding:12px 20px;
+    color:#cbd5e1;
+    text-decoration:none;
+    transition:.2s;
+    font-size:14px;
+    position:relative;
+}
+
+.sidebar-menu a:hover{
+    background:#1f2937;
+    color:#fff;
+}
+
+.sidebar-menu a.active{
+    background:#2563eb;
+    color:#fff;
+}
+
+.sidebar-menu i{
+    font-size:18px;
+    width:22px;
+}
+
+.sidebar-text{
+    margin-left:12px;
+    transition:.2s;
+}
+
+#sidebar.sidebar-collapsed .sidebar-text{
+    display:none;
+}
+
+#sidebar.sidebar-collapsed .sidebar-menu a:hover::after{
+    content:attr(data-title);
+    position:absolute;
+    left:70px;
+    background:#000;
+    color:#fff;
+    padding:4px 8px;
+    border-radius:6px;
+    white-space:nowrap;
+    font-size:12px;
+}
+
+.submenu a{
+    padding-left:50px;
+    font-size:13px;
+}
+
+.rotate{
+    margin-left:auto;
+    transition:transform .3s ease;
+}
+
+.rotate.open{
+    transform:rotate(90deg);
+}
+
+.topbar{
+    margin-left:var(--sidebar-width);
+    height:60px;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 20px;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+    transition:var(--transition);
+}
+
+body.dark-mode .topbar{
+    background:#1e293b;
+}
+
+.content{
+    margin-left:var(--sidebar-width);
+    padding:30px;
+    transition:var(--transition);
+}
+
+#sidebar.sidebar-collapsed ~ .main .topbar,
+#sidebar.sidebar-collapsed ~ .main .content{
+    margin-left:var(--sidebar-mini);
+}
+
+.toggle-btn{
+    background:none;
+    border:none;
+    font-size:20px;
+    color:#fff;
+}
+</style>
 </head>
+
 <body>
-    
-    {% if messages %}
-        <div id="overlay-message"
-            class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50
-                    d-flex align-items-center justify-content-center"
-            style="z-index: 1050;">
 
-            <div class="bg-white rounded p-4 shadow" style="max-width: 500px; width: 100%;">
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} mb-3">
-                        {{ message }}
-                    </div>
-                {% endfor %}
+<div class="wrapper">
 
-                <div class="text-end">
-                    <button type="button" class="btn btn-secondary"
-                            onclick="closeOverlayMessage()">
-                        Fechar
-                    </button>
-                </div>
-            </div>
-        </div>
+<div id="sidebar">
 
-        <script>
-            function closeOverlayMessage() {
-                const overlay = document.getElementById('overlay-message');
-                if (overlay) {
-                    overlay.remove();
-                }
-            }
-        </script>
-    {% endif %}
-
-<nav class="navbar navbar-dark bg-dark navbar-expand-lg">
-    <div class="container-fluid">
-        <span class="navbar-brand">
-            {{ request.user.business.name }}
-        </span>
-
-        <div class="d-flex">
-            <a href="{% url 'client_list' %}" class="btn btn-outline-light me-2">
-                Clientes
-            </a>
-            <a href="{% url 'sizechart_list' %}" class="btn btn-outline-light me-2">
-                Tamanhos
-            </a>
-            <a href="{% url 'colorchart_list' %}" class="btn btn-outline-light me-2">
-                Cores
-            </a>
-            <a href="{% url 'modelchart_list' %}" class="btn btn-outline-light me-2">
-                Modelos
-            </a>
-            <a href="{% url 'product_list' %}" class="btn btn-outline-light me-2">
-                Produtos
-            </a>
-            <a href="{% url 'order_list' %}" class="btn btn-outline-light me-2">
-                Pedidos
-            </a>
-            <a href="{% url 'logout' %}" class="btn btn-danger">
-                Sair
-            </a>
-        </div>
+    <div class="sidebar-header d-flex justify-content-between align-items-center">
+        <span class="sidebar-text">Sistema</span>
+        <button id="toggle-sidebar" class="toggle-btn">
+            <i class="bi bi-list"></i>
+        </button>
     </div>
-</nav>
 
-<div class="container mt-4">
-    {% block content %}{% endblock %}
+    <div class="sidebar-menu">
+
+        <!-- DASHBOARD -->
+        <a href="{% url 'home' %}" 
+           data-title="Dashboard"
+           class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i>
+            <span class="sidebar-text">Dashboard</span>
+        </a>
+
+        <!-- EMPRESA -->
+        <a href="{% url 'business_update' request.user.business.id %}" 
+           data-title="Empresa"
+           class="{% if 'business' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-building"></i>
+            <span class="sidebar-text">Empresa</span>
+        </a>
+
+        <!-- USUÁRIOS -->
+        <a href="{% url 'user_list' %}" 
+           data-title="Usuários"
+           class="{% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-person-gear"></i>
+            <span class="sidebar-text">Usuários</span>
+        </a>
+
+        <!-- CLIENTES -->
+        <a href="{% url 'client_list' %}" 
+           data-title="Clientes"
+           class="{% if 'client' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-people"></i>
+            <span class="sidebar-text">Clientes</span>
+        </a>
+
+        <!-- PEDIDOS -->
+        <a href="{% url 'order_list' %}" 
+           data-title="Pedidos"
+           class="{% if 'order' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-bag"></i>
+            <span class="sidebar-text">Pedidos</span>
+        </a>
+
+        <!-- ESTOQUE -->
+        <a data-bs-toggle="collapse" href="#estoqueMenu" data-title="Estoque" class="{% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %} active {% endif %}">
+            <i class="bi bi-box-seam"></i>
+            <span class="sidebar-text">Estoque</span>
+            <i class="bi bi-chevron-right rotate"></i>
+        </a>
+
+        <div class="collapse submenu {% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %} show {% endif %}" id="estoqueMenu">
+
+            <a href="{% url 'product_list' %}" 
+               class="{% if 'product' in request.resolver_match.url_name %}active{% endif %}">
+               Produtos
+            </a>
+
+            <a href="{% url 'colorchart_list' %}" 
+               class="{% if 'colorchart' in request.resolver_match.url_name %}active{% endif %}">
+               Cores
+            </a>
+
+            <a href="{% url 'modelchart_list' %}" 
+               class="{% if 'modelchart' in request.resolver_match.url_name %}active{% endif %}">
+               Modelos
+            </a>
+
+            <a href="{% url 'sizechart_list' %}" 
+               class="{% if 'sizechart' in request.resolver_match.url_name %}active{% endif %}">
+               Tamanhos
+            </a>
+
+        </div>
+
+        <!-- FINANCEIRO -->
+        <a data-bs-toggle="collapse" href="#financeiroMenu" data-title="Financeiro" class="{% if 'financial' in request.resolver_match.url_name or 'bank' in request.resolver_match.url_name or 'paymentmethod' in request.resolver_match.url_name %}active {% endif %}">
+            <i class="bi bi-cash-stack"></i>
+            <span class="sidebar-text">Financeiro</span>
+            <i class="bi bi-chevron-right rotate"></i>
+        </a>
+
+        <div class="collapse submenu {% if 'financial' in request.resolver_match.url_name or 'bank' in request.resolver_match.url_name or 'paymentmethod' in request.resolver_match.url_name %} show {% endif %}" id="financeiroMenu">
+
+            <a href="{% url 'financial_list' %}" 
+               class="{% if 'financial' in request.resolver_match.url_name %}active{% endif %}">
+               Financeiro
+            </a>
+
+            <a href="{% url 'paymentmethod_list' %}" 
+               class="{% if 'paymentmethod' in request.resolver_match.url_name %}active{% endif %}">
+               Formas de Pagamento
+            </a>
+
+            <a href="{% url 'bank_list' %}" 
+               class="{% if 'bank' in request.resolver_match.url_name %}active{% endif %}">
+               Contas Bancárias
+            </a>
+
+        </div>
+
+        <!-- CONFIGURAÇÕES -->
+            {% comment %} <a data-bs-toggle="collapse"
+            href="#configuracoesMenu"
+            data-title="Configurações"
+            class="{% if 'ncm' in request.resolver_match.url_name %}active{% endif %}">
+
+                <i class="bi bi-gear"></i>
+                <span class="sidebar-text">Configurações</span>
+                <i class="bi bi-chevron-right rotate"></i>
+            </a> {% endcomment %}
+
+            <div class="collapse submenu {% if 'ncm' in request.resolver_match.url_name %}show{% endif %}"
+                id="configuracoesMenu">
+
+            </div>
+
+            <a data-bs-toggle="collapse" href="#configFiscal" data-title="Fiscal">
+                <i class="bi bi-receipt"></i>
+                <span class="sidebar-text">Fiscal</span>
+                <i class="bi bi-chevron-right rotate"></i>
+            </a>
+
+            <div class="collapse submenu" id="configFiscal">
+
+                <a href="{% url 'ncm_group_list' %}">
+                    Grupos NCM
+                </a>
+
+                <a href="{% url 'operation_list' %}">
+                    Operações Fiscais
+                </a>
+
+            </div>
+
+
+        <form action="{% url 'logout' %}" method="post" id="logout-form" class="d-none">
+            {% csrf_token %}
+        </form>
+
+        <a href="#" onclick="document.getElementById('logout-form').submit(); return false;">
+            <i class="bi bi-box-arrow-right"></i>
+            <span class="sidebar-text">Sair</span>
+        </a>
+
+    </div>
 </div>
+
+<div class="main flex-grow-1">
+
+    <div class="topbar">
+        <strong>{{ request.user.business.name }}</strong>
+        <span>{{ request.user.username }}</span>
+    </div>
+
+    <div class="content">
+    {% if messages %}
+    <div class="container mt-3">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+        {% block content %}{% endblock %}
+    </div>
+
+</div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+
+    const sidebar=document.getElementById('sidebar');
+    const toggle=document.getElementById('toggle-sidebar');
+    const darkBtn=document.getElementById('darkToggle');
+
+    if(localStorage.getItem('sidebar')==='collapsed'){
+        sidebar.classList.add('sidebar-collapsed');
+    }
+
+    toggle.addEventListener('click',function(){
+        sidebar.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('sidebar',
+            sidebar.classList.contains('sidebar-collapsed')?'collapsed':'open'
+        );
+    });
+
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn=>{
+        const icon=btn.querySelector('.rotate');
+        const target=document.querySelector(btn.getAttribute('href'));
+
+        target.addEventListener('show.bs.collapse',()=>icon.classList.add('open'));
+        target.addEventListener('hide.bs.collapse',()=>icon.classList.remove('open'));
+
+        if(target.classList.contains('show')){
+            icon.classList.add('open');
+        }
+    });
+
+    if(localStorage.getItem('dark')==='on'){
+        document.body.classList.add('dark-mode');
+    }
+
+    if(darkBtn){
+        darkBtn.addEventListener('click',function(){
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('dark',
+                document.body.classList.contains('dark-mode')?'on':'off'
+            );
+        });
+    }
+
+});
+</script>
+
+{% block extra_js %}{% endblock %}
 
 </body>
 </html>

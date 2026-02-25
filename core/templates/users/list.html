@@ -1,0 +1,192 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Usuários{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+.card-dashboard{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}
+
+.table thead th{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    background:#f8f9fa;
+}
+
+.btn-icon{
+    width:34px;
+    height:34px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #dee2e6;
+    background:#fff;
+    transition:.2s;
+}
+
+.btn-icon:hover{
+    transform:scale(1.05);
+}
+
+.btn-primary-icon{
+    background:#0d6efd;
+    color:#fff;
+    border:none;
+}
+
+.btn-danger-icon{
+    background:#dc3545;
+    color:#fff;
+    border:none;
+}
+</style>
+
+<div class="container mt-4">
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Usuários</h4>
+
+    <a href="{% url 'user_create' %}"
+       class="btn-icon btn-primary-icon">
+        <i class="bi bi-plus-lg"></i>
+    </a>
+</div>
+
+<!-- DASHBOARD -->
+<div class="row mb-4 g-3">
+
+<div class="col-md-4">
+    <div class="card card-dashboard border-start border-4 border-primary">
+        <div class="card-body py-2">
+            <small class="text-muted">Total de Usuários</small>
+            <h5 class="fw-bold mb-0">{{ total_users }}</h5>
+        </div>
+    </div>
+</div>
+
+<div class="col-md-4">
+    <div class="card card-dashboard border-start border-4 border-success">
+        <div class="card-body py-2">
+            <small class="text-muted">Com Email</small>
+            <h5 class="fw-bold mb-0">{{ users_with_email }}</h5>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- BUSCA -->
+<div class="card card-dashboard mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+
+            <div class="col-md-6">
+                <label class="form-label">Buscar usuário</label>
+                <input type="text"
+                       name="q"
+                       value="{{ search }}"
+                       class="form-control"
+                       placeholder="Usuário, nome ou email">
+            </div>
+
+            <div class="col-md-3 d-flex gap-2">
+                <button class="btn-icon btn-primary-icon">
+                    <i class="bi bi-search"></i>
+                </button>
+
+                <a href="{% url 'user_list' %}"
+                   class="btn-icon">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- TABELA -->
+<div class="card card-dashboard">
+<div class="table-responsive">
+<table class="table align-middle mb-0">
+
+<thead>
+<tr>
+    <th>Usuário</th>
+    <th class="d-none d-md-table-cell">Nome</th>
+    <th class="d-none d-md-table-cell">Email</th>
+    <th class="d-none d-md-table-cell">Perfil</th>
+    <th class="text-center" width="110">Ações</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for user in users %}
+<tr>
+
+<td>
+    <strong>{{ user.username }}</strong>
+
+    <div class="d-md-none small text-muted mt-1">
+        <div>{{ user.first_name }} {{ user.last_name }}</div>
+        <div>{{ user.email }}</div>
+        <div>{{ user.get_role_display }}</div>
+    </div>
+</td>
+
+<td class="d-none d-md-table-cell">
+    {{ user.first_name }} {{ user.last_name }}
+</td>
+
+<td class="d-none d-md-table-cell">
+    {{ user.email|default:"—" }}
+</td>
+
+<td class="d-none d-md-table-cell">
+    {{ user.get_role_display }}
+</td>
+
+<td>
+    <div class="d-flex justify-content-center gap-2">
+
+        {% comment %} <a href="{% url 'user_update' user.id %}"
+           class="btn-icon">
+            <i class="bi bi-pencil"></i>
+        </a> {% endcomment %}
+
+        {% comment %} <a href="{% url 'user_delete' user.id %}"
+           class="btn-icon btn-danger-icon"
+           onclick="return confirm('Excluir este usuário?')">
+            <i class="bi bi-trash"></i>
+        </a> {% endcomment %}
+
+    </div>
+</td>
+
+</tr>
+
+{% empty %}
+<tr>
+<td colspan="5"
+    class="text-center text-muted py-4">
+    Nenhum usuário encontrado
+</td>
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+{% endblock %}

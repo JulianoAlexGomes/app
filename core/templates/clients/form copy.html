@@ -1,0 +1,203 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Cliente{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+.card-dashboard{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}
+
+.section-title{
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    color:#6c757d;
+    margin-bottom:15px;
+}
+</style>
+
+<div class="container mt-4">
+
+<h4 class="fw-bold mb-4">
+    {{ view.object|default:"Novo Cliente" }}
+</h4>
+
+<form method="post" novalidate>
+{% csrf_token %}
+
+<!-- ================= IDENTIFICAÇÃO ================= -->
+<div class="card card-dashboard mb-4">
+<div class="card-body">
+
+<div class="section-title">Identificação</div>
+
+<div class="row g-3">
+
+<div class="col-md-12">
+<label class="form-label">Nome / Razão Social</label>
+{{ form.name }}
+</div>
+
+<div class="col-md-12">
+<label class="form-label">Nome Fantasia</label>
+{{ form.fantasy_name }}
+</div>
+
+<div class="col-md-6">
+<label class="form-label">CPF / CNPJ</label>
+<div class="input-group">
+    {{ form.document }}
+    <button type="button" class="btn btn-outline-secondary" id="btn-search-cnpj">
+        <i class="bi bi-search"></i>
+    </button>
+</div>
+<div class="invalid-feedback">
+    CPF ou CNPJ inválido
+</div>
+</div>
+
+<div class="col-md-4 d-flex align-items-end">
+<div class="form-check">
+{{ form.supplier }}
+<label class="form-check-label">Fornecedor</label>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<!-- ================= ENDEREÇO ================= -->
+<div class="card card-dashboard mb-4">
+<div class="card-body">
+
+<div class="section-title">Endereço</div>
+
+<div class="row g-3">
+
+<div class="col-md-4">
+<label class="form-label">CEP</label>
+<div class="input-group">
+{{ form.zip_code }}
+<button type="button" class="btn btn-outline-secondary" id="btn-search-cep">
+<i class="bi bi-search"></i>
+</button>
+</div>
+</div>
+
+<div class="col-md-8">
+<label class="form-label">Logradouro</label>
+{{ form.street }}
+</div>
+
+<div class="col-md-3">
+<label class="form-label">Número</label>
+{{ form.number }}
+</div>
+
+<div class="col-md-9">
+<label class="form-label">Complemento</label>
+{{ form.complement }}
+</div>
+
+<div class="col-md-4">
+<label class="form-label">Bairro</label>
+{{ form.neighborhood }}
+</div>
+
+<div class="col-md-4">
+<label class="form-label">Cidade</label>
+{{ form.city }}
+</div>
+
+<div class="col-md-2">
+<label class="form-label">UF</label>
+{{ form.state }}
+</div>
+
+<div class="col-md-4">
+<label class="form-label">Código IBGE</label>
+{{ form.city_ibge }}
+</div>
+
+</div>
+</div>
+</div>
+
+<!-- ================= DADOS FISCAIS ================= -->
+<div class="card card-dashboard mb-4">
+<div class="card-body">
+
+<div class="section-title">Dados Fiscais</div>
+
+<div class="row g-3">
+
+<div class="col-md-4">
+<label class="form-label">Inscrição Estadual</label>
+{{ form.state_registration }}
+</div>
+
+<div class="col-md-4 d-flex align-items-end">
+<div class="form-check">
+{{ form.is_exempt }}
+<label class="form-check-label">
+    Isento de IE
+</label>
+</div>
+</div>
+
+<div class="col-md-4">
+<label class="form-label">Tipo de Contribuinte ICMS</label>
+{{ form.taxpayer_type }}
+</div>
+
+</div>
+</div>
+</div>
+
+<!-- ================= CONTATO ================= -->
+<div class="card card-dashboard mb-4">
+<div class="card-body">
+
+<div class="section-title">Contato</div>
+
+<div class="row g-3">
+
+<div class="col-md-6">
+<label class="form-label">Email</label>
+{{ form.email }}
+</div>
+
+<div class="col-md-6">
+<label class="form-label">Telefone</label>
+{{ form.phone }}
+</div>
+
+</div>
+</div>
+</div>
+
+<!-- ================= BOTÕES ================= -->
+<div class="d-flex justify-content-end gap-2">
+<a href="{% url 'client_list' %}" class="btn btn-outline-secondary">
+Cancelar
+</a>
+<button class="btn btn-success">
+💾 Salvar
+</button>
+</div>
+
+</form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/client_form.js' %}"></script>
+{% endblock %}

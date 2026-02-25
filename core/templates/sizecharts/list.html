@@ -1,40 +1,112 @@
 {% extends 'base/base.html' %}
-
+{% load static %}
 {% block title %}Tamanhos{% endblock %}
 
 {% block content %}
 
-<div class="d-flex justify-content-between mb-3">
-    <h2>Tamanhos</h2>
-    <a href="{% url 'sizechart_create' %}" class="btn btn-success">
-        Novo Tamanho
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+.card-dashboard{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}
+.table thead th{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    background:#f8f9fa;
+}
+.btn-icon{
+    width:34px;height:34px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid #dee2e6;background:#fff;transition:.2s;
+}
+.btn-icon:hover{ transform:scale(1.05); }
+.btn-primary-icon{ background:#0d6efd;color:#fff;border:none; }
+.btn-danger-icon{ background:#dc3545;color:#fff;border:none; }
+</style>
+
+<div class="container mt-4">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Tamanhos</h4>
+    <a href="{% url 'sizechart_create' %}" class="btn-icon btn-primary-icon">
+        <i class="bi bi-plus-lg"></i>
     </a>
 </div>
-<form method="get" class="mb-3 d-flex">
-    <input type="text" name="q" value="{{ search }}" class="form-control me-2" placeholder="Buscar tamanho">
-    <button class="btn btn-outline-primary">Buscar</button>
-</form>
-<table class="table table-bordered table-striped">
-    <thead>
-        <tr>
-            <th>Nome</th>
-            <th>Descrição</th>
-            <th class="text-end">Ações</th>
-        </tr>
-    </thead>
-    <tbody>
+
+<div class="card card-dashboard mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label">Buscar tamanho</label>
+                <input type="text" name="q" value="{{ search }}"
+                       class="form-control" placeholder="Nome do tamanho">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button class="btn-icon btn-primary-icon">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'sizechart_list' %}" class="btn-icon">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card card-dashboard">
+<div class="table-responsive">
+<table class="table align-middle mb-0">
+<thead>
+<tr>
+    <th>Nome</th>
+    <th class="d-none d-md-table-cell">Descrição</th>
+    <th class="text-center" width="110">Ações</th>
+</tr>
+</thead>
+<tbody>
+
 {% for sizechart in sizecharts %}
 <tr>
-    <td>{{ sizechart.name }}</td>
-    <td>{{ sizechart.description }}</td>
-    <td class="text-end">
-        <a href="{% url 'sizechart_update' sizechart.id %}" class="btn btn-sm btn-warning">Editar</a>
-        <a href="{% url 'sizechart_delete' sizechart.id %}" class="btn btn-sm btn-danger">Excluir</a>
+    <td>
+        <strong>{{ sizechart.name }}</strong>
+        <div class="d-md-none small text-muted">
+            {{ sizechart.description|default:"—" }}
+        </div>
+    </td>
+
+    <td class="d-none d-md-table-cell">
+        {{ sizechart.description|default:"—" }}
+    </td>
+
+    <td>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="{% url 'sizechart_update' sizechart.id %}" class="btn-icon">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'sizechart_delete' sizechart.id %}"
+               class="btn-icon btn-danger-icon"
+               onclick="return confirm('Excluir tamanho?');">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="3" class="text-center text-muted py-4">
+        Nenhum tamanho encontrado
     </td>
 </tr>
 {% endfor %}
+
 </tbody>
-
 </table>
+</div>
+</div>
 
+</div>
 {% endblock %}

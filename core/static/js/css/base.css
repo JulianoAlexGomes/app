@@ -1,0 +1,147 @@
+/* =========================
+   BASE
+========================= */
+body {
+    margin: 0;
+    overflow-x: hidden;
+    background-color: #0f1115;
+    color: #e5e7eb;
+}
+
+/* Remove margem automática do Bootstrap no topo */
+h1, h2, h3, h4, h5 {
+    margin-top: 0;
+}
+
+/* =========================
+   SIDEBAR
+========================= */
+#sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background: #151823;
+    position: fixed;
+    top: 0;
+    left: 0;
+    border-right: 1px solid #23263a;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+/* =========================
+   CONTEÚDO
+========================= */
+#page-content {
+    margin-left: 260px;
+    padding: 16px 20px 20px;
+    min-height: 100vh;
+    background: #0f1115;
+    transition: margin-left 0.3s ease;
+}
+
+/* Container do conteúdo */
+.page-container {
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+
+/* SIDEBAR MINIMIZADA */
+body.sidebar-collapsed #page-content {
+    margin-left: 70px;
+}
+
+/* =========================
+   SIDEBAR LINKS
+========================= */
+.sidebar-link {
+    display: block;
+    padding: 8px 12px;
+    color: #9ca3af;
+    text-decoration: none;
+    border-radius: 6px;
+}
+
+.sidebar-link:hover {
+    background: #1f2937;
+    color: #fff;
+}
+
+/* =========================
+   ACCORDION
+========================= */
+.accordion-button {
+    background: transparent;
+    color: #e5e7eb;
+}
+
+.accordion-button:not(.collapsed) {
+    background: rgba(99,102,241,.2);
+    color: #fff;
+}
+
+.accordion-button::after {
+    filter: invert(1);
+}
+
+/* =========================
+   GRID / CARDS ESCUROS
+========================= */
+.card,
+.table-responsive,
+.tab-content,
+.bg-white,
+.bg-light {
+    background: #161a25 !important;
+    border-color: #23263a !important;
+}
+
+/* =========================
+   TABELAS
+========================= */
+.table {
+    color: #e5e7eb;
+    background: #161a25;
+}
+
+.table thead th {
+    background: #1b1f2e;
+    color: #f9fafb;
+}
+
+.table tbody tr {
+    background: #161a25;
+}
+
+.table tbody tr:hover {
+    background: #1f2937;
+}
+
+/* =========================
+   BOTÃO SAIR
+========================= */
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+}
+
+/* =========================
+   SCROLLBAR
+========================= */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 6px;
+}
+
+.image-card {
+    transition: 0.2s ease;
+}
+
+.image-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}

@@ -4,15 +4,46 @@
 
 {% block content %}
 
-<h2>{{ product.name }}</h2>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+    <h2>
+        {{ variant.product.name }}
+        <small class="text-muted">- Tamanho {{ variant.size }}</small>
+    </h2>
 
-<p>
-    Estoque atual:
-    <span class="badge bg-primary">{{ product.stock_available }}</span>
-</p>
+    <a href="{% url 'product_list' %}" class="btn btn-outline-secondary">
+        ← Voltar
+    </a>
+</div>
+
+<!-- 🔹 RESUMO DE ESTOQUE POR TAMANHO -->
+<div class="d-flex gap-4 mb-4">
+
+    <div>
+        <strong>Estoque físico</strong><br>
+        <span class="badge bg-primary fs-6">
+            {{ variant.stock_real }}
+        </span>
+    </div>
+
+    <div>
+        <strong>Reservado</strong><br>
+        <span class="badge bg-warning text-dark fs-6">
+            {{ variant.stock_reserved }}
+        </span>
+    </div>
+
+    <div>
+        <strong>Disponível</strong><br>
+        <span class="badge bg-success fs-6">
+            {{ variant.stock_available }}
+        </span>
+    </div>
+
+</div>
 
 <hr>
 
+<!-- 🔹 NOVA MOVIMENTAÇÃO MANUAL -->
 <div class="card p-3 mb-4">
     <h5>Nova movimentação</h5>
 
@@ -37,46 +68,102 @@
     </form>
 </div>
 
+<!-- 🔹 HISTÓRICO -->
 <div class="card p-3">
-    <h5>Histórico</h5>
+    <h5>Histórico de Movimentações</h5>
 
-    <table class="table table-striped mt-3">
+    <table class="table table-striped mt-3 align-middle">
         <thead>
             <tr>
-                <th>Tipo</th>
+                <th>Natureza</th>
+                <th>Movimento</th>
+                <th>Tamanho</th>
                 <th>Qtd</th>
                 <th>Data</th>
+                <th>Pedido</th>
                 <th width="60"></th>
             </tr>
         </thead>
         <tbody>
             {% for mov in movements %}
             <tr>
+
+                <!-- Natureza -->
                 <td>
-                    {% if mov.entry_type == 'in' %}
-                        <span class="badge bg-success">Entrada</span>
+                    {% if mov.movement_type == 'RESERVE' %}
+                        <span class="badge bg-warning text-dark">Reserva</span>
+                    {% elif mov.movement_type == 'RELEASE' %}
+                        <span class="badge bg-secondary">Liberação</span>
+                    {% elif mov.movement_type == 'SALE' %}
+                        <span class="badge bg-danger">Venda</span>
+                    {% elif mov.movement_type == 'INITIAL' %}
+                        <span class="badge bg-primary">Inicial</span>
+                    {% elif mov.movement_type == 'ADJUST' %}
+                        <span class="badge bg-info text-dark">Ajuste</span>
                     {% else %}
-                        <span class="badge bg-danger">Saída</span>
+                        <span class="badge bg-light text-dark">—</span>
                     {% endif %}
                 </td>
-                <td>{{ mov.quantity }}</td>
-                <td>{{ mov.timestamp|date:"d/m/Y H:i" }}</td>
+
+                <!-- Movimento -->
                 <td>
+                    {% if mov.entry_type == 'in' %}
+                        <span class="text-success">Entrada</span>
+                    {% elif mov.entry_type == 'out' %}
+                        <span class="text-danger">Saída</span>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+
+                <!-- TAMANHO -->
+                <td>
+                    {{ mov.variant.size }}
+                </td>
+
+                <td>{{ mov.quantity }}</td>
+
+                <td>{{ mov.timestamp|date:"d/m/Y H:i" }}</td>
+
+                <td>
+                    {% if mov.order_item %}
+                        <a href="{% url 'order_update' mov.order_item.order.id %}">
+                            {{ mov.order_item.order.id }}
+                        </a>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <!-- AÇÕES -->
+                <td>
+                    {% if mov.movement_type == 'INITIAL' or mov.movement_type == 'ADJUST' %}
                     <form method="post" action="{% url 'stock_entry_delete' mov.id %}">
                         {% csrf_token %}
                         <button class="btn btn-sm btn-outline-danger">✕</button>
                     </form>
+                    {% endif %}
                 </td>
+
             </tr>
             {% empty %}
             <tr>
-                <td colspan="4" class="text-center text-muted">
-                    Nenhuma movimentação
+                <td colspan="7" class="text-center text-muted">
+                    Nenhuma movimentação registrada
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<div class="alert alert-info">
+    <ul class="mb-0">
+        <li><strong>Reserva</strong>: separa o item para um pedido</li>
+        <li><strong>Venda</strong>: baixa definitivamente o estoque</li>
+        <li><strong>Liberação</strong>: devolve itens reservados</li>
+        <li><strong>Ajuste</strong>: correções manuais</li>
+    </ul>
 </div>
 
 {% endblock %}

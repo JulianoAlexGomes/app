@@ -1,115 +1,204 @@
-let total = 0;
-
-function updateTotal() {
-    document.getElementById('total').innerText =
-        'R$ ' + total.toFixed(2).replace('.', ',');
+function money(v) {
+    return 'R$ ' + (v || 0).toFixed(2).replace('.', ',');
 }
 
-function updatePrice() {
-    const product = document.getElementById('product');
-    const priceType = document.getElementById('price_type').value;
-    const priceInput = document.getElementById('price');
+function recalcTotal() {
+    let total = 0;
 
-    if (!product.value) {
-        priceInput.value = '';
-        return;
-    }
+    document.querySelectorAll('#items-table tr').forEach(row => {
+        const subtotal = parseFloat(row.dataset.subtotal || 0);
+        total += subtotal;
+    });
 
-    const opt = product.selectedOptions[0];
-    const price = priceType === 'price1'
-        ? opt.dataset.price1
-        : opt.dataset.price;
-
-    priceInput.value = parseFloat(price).toFixed(2);
+    document.getElementById('total').innerText = money(total);
 }
 
-function getNextIndex() {
-    return document.querySelectorAll(
-        '[name^="items-"][name$="-product"]'
-    ).length;
-}
+function updateSubtotal(row) {
+    const qty = parseFloat(row.querySelector('[name$="-quantity"]').value || 0);
+    const price = parseFloat(row.querySelector('[name$="-price"]').value || 0);
+    const discount = parseFloat(row.querySelector('[name$="-discount"]').value || 0);
+    const addition = parseFloat(row.querySelector('[name$="-addition"]').value || 0);
 
-function updateTotalForms() {
-    document.getElementById('id_items-TOTAL_FORMS').value =
-        document.querySelectorAll('[name^="items-"][name$="-product"]').length;
-}
-
-function addItem() {
-    const product = document.getElementById('product');
-    const qty = parseFloat(document.getElementById('quantity').value);
-    const price = parseFloat(document.getElementById('price').value);
-    const discount = parseFloat(document.getElementById('discount').value || 0);
-    const addition = parseFloat(document.getElementById('addition').value || 0);
-
-    if (!product.value || qty <= 0 || !price) {
-        alert('Dados inválidos');
-        return;
-    }
-
-    const index = getNextIndex();
     const subtotal = (qty * price) - discount + addition;
-    total += subtotal;
 
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>${product.selectedOptions[0].text}</td>
-        <td>${qty}</td>
-        <td>${price.toFixed(2)}</td>
-        <td>${discount.toFixed(2)}</td>
-        <td>${addition.toFixed(2)}</td>
-        <td>R$ ${subtotal.toFixed(2)}</td>
-        <td>
-            <button type="button" class="btn btn-danger btn-sm">✕</button>
-        </td>
-    `;
+    row.dataset.subtotal = subtotal;
+    row.querySelector('.subtotal').innerText = money(subtotal);
 
-    row.querySelector('button').onclick = () => {
-        total -= subtotal;
+    recalcTotal();
+}
 
-        // ⚠️ SOMENTE AQUI criamos o DELETE
-        document.getElementById('formset-container').insertAdjacentHTML(
-            'beforeend',
-            `<input type="hidden" name="items-${index}-DELETE" value="on">`
-        );
+function bindRowEvents(row) {
+    row.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', () => updateSubtotal(row));
+        el.addEventListener('change', () => updateSubtotal(row));
+    });
 
-        row.remove();
-        updateTotal();
-    };
+    const removeBtn = row.querySelector('.remove-item');
+    if (removeBtn) {
+        removeBtn.onclick = () => {
+            const del = row.querySelector('[name$="-DELETE"]');
+            if (del) del.checked = true;
+
+            row.style.display = 'none';
+            row.dataset.subtotal = 0;
+
+            recalcTotal();
+        };
+    }
+}
+
+function addItemFromForm(variantId, price, qty, discount, addition) {
+
+    const rows = document.querySelectorAll('#items-table tr');
+
+    // 🔥 Verifica se já existe
+    for (let row of rows) {
+
+        const variantField = row.querySelector('[name$="-variant"]');
+
+        if (variantField && variantField.value == variantId && row.style.display !== 'none') {
+
+            const qtyInput = row.querySelector('[name$="-quantity"]');
+            const currentQty = parseFloat(qtyInput.value || 0);
+
+            qtyInput.value = currentQty + qty;
+
+            updateSubtotal(row);
+
+            return; // 🔥 Para aqui — não cria nova linha
+        }
+    }
+
+    // 🔥 Se não existir, cria normalmente
+    const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+    const index = parseInt(totalFormsInput.value);
+
+    const template = document.getElementById('empty-form-template')
+        .innerHTML.replace(/__prefix__/g, index);
+
+    const temp = document.createElement('tbody');
+    temp.innerHTML = template;
+
+    const row = temp.firstElementChild;
 
     document.getElementById('items-table').appendChild(row);
 
-    // ✅ CAMPOS DO FORMSET (SEM DELETE)
-    document.getElementById('formset-container').insertAdjacentHTML(
-        'beforeend',
-        `
-        <input type="hidden" name="items-${index}-id" value="">
-        <input type="hidden" name="items-${index}-product" value="${product.value}">
-        <input type="hidden" name="items-${index}-quantity" value="${qty}">
-        <input type="hidden" name="items-${index}-price" value="${price}">
-        <input type="hidden" name="items-${index}-discount" value="${discount}">
-        <input type="hidden" name="items-${index}-addition" value="${addition}">
-        `
-    );
+    totalFormsInput.value = index + 1;
 
-    updateTotalForms();
-    updateTotal();
+    row.querySelector('[name$="-variant"]').value = variantId;
+    row.querySelector('[name$="-quantity"]').value = qty;
+    row.querySelector('[name$="-price"]').value = price;
+    row.querySelector('[name$="-discount"]').value = discount;
+    row.querySelector('[name$="-addition"]').value = addition;
+
+    bindRowEvents(row);
+    updateSubtotal(row);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('#items-table tr').forEach(row => {
-        const value = row.children[5]?.innerText
-            ?.replace('R$', '')
-            ?.replace(',', '.')
-            ?.trim();
 
-        if (value) {
-            total += parseFloat(value);
+document.addEventListener('DOMContentLoaded', function () {
+
+    /* ==============================
+       🔎 SELECT2 - BUSCA PROFISSIONAL
+    ============================== */
+
+    $('#product').select2({
+        placeholder: 'Buscar produto ou tamanho...',
+        minimumInputLength: 1,
+        ajax: {
+            url: '/ajax/variants/',
+            dataType: 'json',
+            delay: 300,
+            data: function (params) {
+                return {
+                    q: params.term
+                };
+            },
+            processResults: function (data) {
+                return {
+                    results: data.results.map(item => ({
+                        id: item.id,
+                        text: item.text,
+                        price: item.price,
+                        price1: item.price1
+                    }))
+                };
+            },
+            cache: true
         }
     });
 
-    updateTotal();
+    /* ==============================
+       💰 AUTO PREÇO AO SELECIONAR
+    ============================== */
 
-    document.getElementById('add-item-btn').onclick = addItem;
-    document.getElementById('product').onchange = updatePrice;
-    document.getElementById('price_type').onchange = updatePrice;
+    $('#product').on('select2:select', function (e) {
+        const data = e.params.data;
+        const priceType = document.getElementById('price_type').value;
+
+        const price = priceType === 'price1'
+            ? data.price1
+            : data.price;
+
+        document.getElementById('price').value =
+            price ? parseFloat(price).toFixed(2) : '';
+    });
+
+    /* ==============================
+       🔄 TROCA TIPO PREÇO
+    ============================== */
+
+    document.getElementById('price_type').addEventListener('change', function () {
+
+        const selected = $('#product').select2('data');
+
+        if (!selected.length) return;
+
+        const data = selected[0];
+
+        const price = this.value === 'price1'
+            ? data.price1
+            : data.price;
+
+        document.getElementById('price').value =
+            price ? parseFloat(price).toFixed(2) : '';
+    });
+
+    /* ==============================
+       ➕ ADICIONAR ITEM
+    ============================== */
+
+    document.getElementById('add-item-btn').onclick = function () {
+
+        const selected = $('#product').select2('data');
+
+        if (!selected.length) return;
+
+        const variantId = selected[0].id;
+
+        addItemFromForm(
+            variantId,
+            parseFloat(document.getElementById('price').value || 0),
+            parseFloat(document.getElementById('quantity').value || 1),
+            parseFloat(document.getElementById('discount').value || 0),
+            parseFloat(document.getElementById('addition').value || 0)
+        );
+
+        // Reset visual
+        $('#product').val(null).trigger('change');
+        document.getElementById('quantity').value = 1;
+        document.getElementById('discount').value = 0;
+        document.getElementById('addition').value = 0;
+        document.getElementById('price').value = '';
+    };
+
+    /* ==============================
+       📦 ITENS JÁ EXISTENTES
+    ============================== */
+
+    document.querySelectorAll('.item-form').forEach(row => {
+        updateSubtotal(row);
+        bindRowEvents(row);
+    });
+
 });

@@ -1,0 +1,113 @@
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #000;
+            color: #fff;
+        }
+
+        .login-wrapper {
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* Lado esquerdo */
+        .login-form {
+            width: 45%;
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Logo */
+        .logo {
+            width: 220px;
+            margin-bottom: 50px;
+        }
+
+        /* Lado direito (imagem) */
+        .login-bg {
+            width: 55%;
+            background: 
+                linear-gradient(to left, rgba(0,0,0,0.9), rgba(0,0,0,0.2)),
+                url("https://images.unsplash.com/photo-1501785888041-af3ef285b470");
+            background-size: cover;
+            background-position: center;
+        }
+
+        h1 {
+            font-weight: 700;
+            margin-bottom: 40px;
+        }
+
+        h1 span {
+            color: #6366f1;
+        }
+
+        label {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            background: #111;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            color: #fff;
+            padding: 14px;
+        }
+
+        .form-control:focus {
+            background: #111;
+            color: #fff;
+            border-image: linear-gradient(90deg, #6366f1, #ec4899) 1;
+            box-shadow: none;
+        }
+
+        .btn-login {
+            margin-top: 30px;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            background: linear-gradient(90deg, #6366f1, #ec4899);
+            color: #fff;
+        }
+
+        .btn-login:hover {
+            opacity: 0.9;
+        }
+
+        footer {
+            position: absolute;
+            bottom: 30px;
+            left: 80px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        @media (max-width: 991px) {
+            .login-bg {
+                display: none;
+            }
+
+            .login-form {
+                width: 100%;
+                padding: 40px;
+            }
+
+            footer {
+                left: 40px;
+            }
+        }
+        
+td.status-FATURADO { color: #22c55e; }
+td.status-ORCAMENTO { color: #eab308; }
+td.status-EM_SEPARACAO { color: #38bdf8; }
+td.status-SEPARADO { color: #a78bfa; }
+td.status-DIGITACAO { color: #fb7185; }

@@ -1,0 +1,281 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Financeiro{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between mb-3">
+        <h4>Financeiro</h4>
+        <a href="{% url 'financial_create' %}" class="btn btn-primary">
+            + Novo Lançamento
+        </a>
+    </div>
+
+    <!-- Filtro -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+
+               <div class="col-md-3">
+                    <label>Cliente</label>
+                    <select name="client" id="clientSelect" class="form-select">
+                        <option value="">Todos</option>
+                        {% for client in clients %}
+                            <option value="{{ client.id }}"
+                                {% if client_id == client.id|stringformat:"s" %}selected{% endif %}>
+                                {{ client.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label>Data Inicial</label>
+                    <input type="date"
+                           name="start_date"
+                           value="{{ start_date }}"
+                           class="form-control">
+                </div>
+
+                <div class="col-md-2">
+                    <label>Data Final</label>
+                    <input type="date"
+                           name="end_date"
+                           value="{{ end_date }}"
+                           class="form-control">
+                </div>
+
+                <div class="col-md-2">
+                    <label>Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="paid" {% if status == 'paid' %}selected{% endif %}>
+                            Pago
+                        </option>
+                        <option value="open" {% if status == 'open' %}selected{% endif %}>
+                            Aberto
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        Filtrar
+                    </button>
+
+                    <a href="{% url 'financial_list' %}" class="btn btn-secondary">
+                        Limpar
+                    </a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-4">
+
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6>Total Entradas (Pagas)</h6>
+                    <h4>R$ {{ total_entradas|floatformat:2 }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6>Total Saídas (Pagas)</h6>
+                    <h4>R$ {{ total_saidas|floatformat:2 }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <h6>Saldo</h6>
+                    <h4>R$ {{ saldo|floatformat:2 }}</h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Abas -->
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active"
+                    data-bs-toggle="tab"
+                    data-bs-target="#entradas"
+                    type="button">
+                Entradas
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="tab"
+                    data-bs-target="#saidas"
+                    type="button">
+                Saídas
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- ENTRADAS -->
+        <div class="tab-pane fade show active" id="entradas">
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Parcela</th>
+                            <th>Descrição</th>
+                            <th>Valor</th>
+                            <th>Banco</th>
+                            <th>Status</th>
+                            <th width="150">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for parcel in entradas %}
+                            <tr>
+                                <td>{{ parcel.movement.id }}</td>
+                                <td>{{ parcel.movement.client.name }}</td>
+                                <td>{{ parcel.deadline|date:"d/m/Y" }}</td>
+                                <td>{{ parcel.parcel }}</td>
+                                <td>
+                                    {% if parcel.movement.order %}
+                                        <a href="{% url 'order_update' parcel.movement.order.id %}"
+                                        class="btn btn-sm btn-outline-primary">
+                                            Pedido {{ parcel.movement.order.id }}
+                                        </a>
+                                    {% else %}
+                                        {{ parcel.movement.description }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-success fw-bold">
+                                    R$ {{ parcel.value|floatformat:2 }}
+                                </td>
+                                <td>{{ parcel.movement.bank }}</td>
+                                <td>
+                                    {% if parcel.payed %}
+                                        <span class="badge bg-success">Pago</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Aberto</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if parcel.movement.order == None %}
+                                        <a href="{% url 'financial_update' parcel.movement.id %}"
+                                        class="btn btn-sm btn-primary">
+                                            Editar
+                                        </a>
+                                    {% endif %}
+
+                                    {% if not parcel.payed %}
+                                        <a href="{% url 'parcel_pay' parcel.pk %}"
+                                        class="btn btn-sm btn-success">
+                                            Pagar
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                Nenhuma entrada encontrada
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+        <!-- SAÍDAS -->
+        <div class="tab-pane fade" id="saidas">
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Parcela</th>
+                            <th>Descrição</th>
+                            <th>Valor</th>
+                            <th>Status</th>
+                            <th width="150">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for parcel in saidas %}
+                        <tr>
+                            <td>{{ parcel.movement.id }}</td>
+                            <td>{{ parcel.movement.client.name }}</td>
+                            <td>{{ parcel.deadline|date:"d/m/Y" }}</td>
+                            <td>{{ parcel.parcel }}</td>
+                            <td>{{ parcel.movement.description }}</td>
+                            <td class="text-danger fw-bold">
+                                R$ {{ parcel.value|floatformat:2 }}
+                            </td>
+                            <td>
+                                {% if parcel.payed %}
+                                    <span class="badge bg-success">Pago</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Aberto</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not parcel.payed %}
+                                    <a href="{% url 'parcel_pay' parcel.pk %}"
+                                       class="btn btn-sm btn-success">
+                                        Pagar
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                Nenhuma saída encontrada
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        $('#clientSelect').select2({
+            placeholder: "Buscar cliente...",
+            allowClear: true,
+            width: '100%'
+        });
+    });
+</script>
+{% endblock %}
+
+
+{% endblock %}

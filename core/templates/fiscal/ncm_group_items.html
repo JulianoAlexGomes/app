@@ -1,0 +1,112 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Itens do Grupo NCM{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <!-- TÍTULO -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">Itens do Grupo</h4>
+            <small class="text-muted">{{ group.name }}</small>
+        </div>
+
+        <a href="{% url 'ncm_group_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <!-- CARD PRINCIPAL -->
+    <div class="card">
+        <div class="card-body">
+
+            <!-- ================= ADICIONAR NCM ================= -->
+            <form method="post" id="add-ncm-form" class="row g-3 mb-4">
+                {% csrf_token %}
+
+                <div class="col-md-10 position-relative">
+                    <label class="form-label">Pesquisar e adicionar NCM</label>
+
+                    <input type="text"
+                           id="ncm-search"
+                           class="form-control"
+                           placeholder="Digite código ou descrição do NCM..."
+                           autocomplete="off">
+
+                    <input type="hidden" name="ncm_id" id="ncm-id">
+
+                    <!-- Dropdown AJAX -->
+                    <div id="ncm-results"
+                         class="list-group position-absolute w-100 shadow-sm"
+                         style="z-index: 1050; display:none; max-height: 300px; overflow-y:auto;">
+                    </div>
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit"
+                            id="btn-add-ncm"
+                            class="btn btn-primary w-100"
+                            disabled>
+                        Adicionar
+                    </button>
+                </div>
+            </form>
+
+            <hr>
+
+            <!-- ================= LISTA ATUAL ================= -->
+            <h6 class="fw-bold mb-3">NCMs Vinculados</h6>
+
+            {% if group.items.all %}
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="150">Código</th>
+                            <th>Descrição</th>
+                            <th width="120" class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in group.items.all %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.ncm.code }}</strong>
+                            </td>
+                            <td>
+                                {{ item.ncm.description }}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'remove_ncm_from_group' group.id item.ncm.id %}"
+                                   class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('Remover este NCM do grupo?')">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <div class="alert alert-warning mt-3 mb-0">
+                    Nenhum NCM vinculado ainda.
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= CONFIG GLOBAL PARA JS ================= -->
+<script>
+    window.NCM_SEARCH_URL = "{% url 'ajax_ncm_search' %}";
+</script>
+
+<!-- ================= JS EXTERNO ================= -->
+<script src="{% static 'js/ncm_group_items.js' %}"></script>
+
+{% endblock %}

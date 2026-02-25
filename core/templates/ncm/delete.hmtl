@@ -1,0 +1,31 @@
+{% extends 'base/base.html' %}
+{% block title %}Excluir NCM{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+<div class="card card-dashboard p-4 text-center">
+
+    <h5 class="mb-3">Excluir NCM</h5>
+
+    <p>
+        Tem certeza que deseja excluir
+        <strong>{{ object.code }}</strong>?
+    </p>
+
+    <form method="post" class="d-flex justify-content-center gap-3 mt-4">
+        {% csrf_token %}
+        <a href="{% url 'ncm_list' %}" class="btn btn-outline-secondary">
+            Cancelar
+        </a>
+        <button class="btn btn-danger">
+            Excluir
+        </button>
+    </form>
+
+</div>
+
+</div>
+
+{% endblock %}

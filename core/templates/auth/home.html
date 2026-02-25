@@ -1,56 +1,286 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Home{% endblock %}</title>
+{% extends 'base/base.html' %}
+{% load static %}
+{% block content %}
 
-    <!-- Bootstrap 5 CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</head>
-<body>
-<nav class="navbar navbar-dark bg-dark navbar-expand-lg">
-    <div class="container-fluid">
-        <span class="navbar-brand">
-            {{ request.user.business.name }}
-        </span>
+{% comment %} <h2 class="mb-4">Dashboard</h2> {% endcomment %}
 
-        <div class="d-flex">
-            <a href="{% url 'client_list' %}" class="btn btn-outline-light me-2">
-                Clientes
-            </a>
-            <a href="{% url 'sizechart_list' %}" class="btn btn-outline-light me-2">
-                Tamanhos
-            </a>
-            <a href="{% url 'colorchart_list' %}" class="btn btn-outline-light me-2">
-                Cores
-            </a>
-            <a href="{% url 'modelchart_list' %}" class="btn btn-outline-light me-2">
-                Modelos
-            </a>
-            <a href="{% url 'product_list' %}" class="btn btn-outline-light me-2">
-                Produtos
-            </a>
-            {% comment %} <a href="{% url 'stock_entry_list' %}" class="btn btn-outline-light me-2">
-                Entradas Estoque
-            </a>
-            <a href="{% url 'stock_movement_list' %}" class="btn btn-outline-light me-2">
-                Movimentações Estoque
-            </a> {% endcomment %}
-            <a href="{% url 'order_list' %}" class="btn btn-outline-light me-2">
-                Pedidos
-            </a>
-            <a href="{% url 'logout' %}" class="btn btn-outline-light">
-                Sair
-            </a>
+<h4 class="mb-4 fw-semibold">Dashboard</h4>
+
+<style>
+.dashboard-card{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.05);
+    height:100%;
+}
+
+.dashboard-card .card-body{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+}
+
+.kpi-title{
+    font-size:13px;
+    color:#6c757d;
+}
+
+.kpi-value{
+    font-size:1.6rem;
+    font-weight:700;
+}
+
+.kpi-sub{
+    font-size:12px;
+    color:#6c757d;
+}
+</style>
+
+<!-- ================= LINHA 1 - KPIs ================= -->
+<div class="row g-3 mb-4">
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-light w-100">
+            <div class="card-body">
+                <div class="kpi-title">Clientes</div>
+                <div class="kpi-value">{{ total_clients }}</div>
+            </div>
         </div>
     </div>
-</nav>
-<div class="container mt-4">
-    {% block content %}
-    <h1>Bem-vindo ao Sistema</h1>
-    <p>Use o menu acima para navegar pelas diferentes seções do sistema.</p>
-    {% endblock %}
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-light w-100">
+            <div class="card-body">
+                <div class="kpi-title">Produtos</div>
+                <div class="kpi-value">{{ total_products }}</div>
+                <div class="kpi-sub">Estoque total: {{ total_stock }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-light w-100">
+            <div class="card-body">
+                <div class="kpi-title">Pedidos (mês)</div>
+                <div class="kpi-value">{{ orders_month }}</div>
+                <div class="kpi-sub">Hoje: {{ orders_today }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-light w-100">
+            <div class="card-body">
+                <div class="kpi-title">Faturamento (mês)</div>
+                <div class="kpi-value text-success">
+                    R$ {{ revenue_month|floatformat:2 }}
+                </div>
+                <div class="kpi-sub">
+                    Ticket médio: R$ {{ ticket_medio|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
-</body>
-</html>
+
+<!-- ================= LINHA 2 - FLUXO + TOTAL ================= -->
+<div class="row g-3 mb-4">
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-success bg-opacity-10 w-100">
+            <div class="card-body">
+                <div class="kpi-title">Entradas Recebidas</div>
+                <div class="kpi-value text-success">
+                    R$ {{ entradas_recebidas|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-danger bg-opacity-10 w-100">
+            <div class="card-body">
+                <div class="kpi-title">Saídas Pagas</div>
+                <div class="kpi-value text-danger">
+                    R$ {{ saidas_pagas|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-primary bg-opacity-10 w-100">
+            <div class="card-body">
+                <div class="kpi-title">Saldo do Mês</div>
+                <div class="kpi-value {% if saldo_mes >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    R$ {{ saldo_mes|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-warning bg-opacity-10 w-100">
+            <div class="card-body">
+                <div class="kpi-title">Contas a Receber</div>
+                <div class="kpi-value">
+                    R$ {{ contas_receber|floatformat:2 }}
+                </div>
+                <div class="kpi-sub text-danger">
+                    Vencidas: R$ {{ contas_vencidas|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Faturado agora alinhado -->
+    {% comment %} <div class="col-12 col-md-6 col-lg-3 d-flex">
+        <div class="card dashboard-card bg-success bg-opacity-10 w-100">
+            <div class="card-body">
+                <div class="kpi-title">Total Faturado</div>
+                <div class="kpi-value text-success">
+                    R$ {{ revenue_total|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div> {% endcomment %}
+
+</div>
+
+
+<!-- ================= GRÁFICOS ================= -->
+<div class="row mb-4 align-items-stretch">
+
+    <div class="col-12 col-lg-8 d-flex">
+        <div class="card shadow-sm border-0 w-100 h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="mb-3">Faturamento por mês</h6>
+                <div class="flex-grow-1">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-4 d-flex">
+        <div class="card shadow-sm border-0 w-100 h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="mb-3">Pedidos por status</h6>
+                <div class="flex-grow-1 d-flex align-items-center">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= ÚLTIMOS PEDIDOS ================= -->
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <h6 class="mb-3">Últimos pedidos</h6>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Cliente</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for order in last_orders %}
+                    <tr>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.client.name }}</td>
+
+                        <td>
+                            <span class="badge 
+                                {% if order.status == 'FATURADO' %}bg-success
+                                {% elif order.status == 'CANCELADO' %}bg-danger
+                                {% elif order.status == 'EM_SEPARACAO' %}bg-warning text-dark
+                                {% else %}bg-secondary{% endif %}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+
+                        <td class="fw-bold">
+                            R$ {{ order.total_amount|floatformat:2 }}
+                        </td>
+
+                        <td>
+                            {{ order.created_at|date:"d/m/Y" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            Nenhum pedido encontrado
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ================= CHART JS ================= -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const salesData = {{ sales_by_month|safe }};
+const statusData = {{ orders_by_status|safe }};
+
+/* ===== Faturamento por mês ===== */
+if (salesData.length > 0) {
+    new Chart(document.getElementById('salesChart'), {
+        type: 'line',
+        data: {
+            labels: salesData.map(i => {
+                const [year, month] = i.month.split('-');
+                return new Date(year, month - 1)
+                    .toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Faturamento',
+                data: salesData.map(i => i.total),
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+/* ===== Pedidos por status ===== */
+if (statusData.length > 0) {
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: statusData.map(i => i.status),
+            datasets: [{
+                data: statusData.map(i => i.total)
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+</script>
+
+{% endblock %}

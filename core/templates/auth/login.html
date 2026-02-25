@@ -1,52 +1,231 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>Login</title>
+<meta charset="UTF-8">
+<title>Login - SaaS</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+
+/* =============================
+   BACKGROUND ANIMATION
+============================= */
+
+body{
+    height:100vh;
+    margin:0;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: linear-gradient(rgba(15,23,42,.85), rgba(15,23,42,.85)),
+                url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1920&q=80');
+    background-size:cover;
+    background-position:center;
+    animation: bgZoom 20s ease-in-out infinite alternate;
+}
+
+@keyframes bgZoom {
+    from { background-size:100%; }
+    to   { background-size:110%; }
+}
+
+/* =============================
+   LOGIN CARD
+============================= */
+
+.login-card{
+    width:100%;
+    max-width:420px;
+    background:rgba(255,255,255,.08);
+    backdrop-filter: blur(25px);
+    border-radius:22px;
+    padding:45px;
+    color:#fff;
+    box-shadow:0 25px 60px rgba(0,0,0,.5);
+
+    opacity:0;
+    transform: translateY(40px);
+    animation: fadeSlide .9s ease forwards;
+}
+
+@keyframes fadeSlide {
+    to{
+        opacity:1;
+        transform: translateY(0);
+    }
+}
+
+/* =============================
+   INPUTS
+============================= */
+
+.form-control{
+    background:rgba(255,255,255,.15);
+    border:none;
+    color:#fff;
+    border-radius:14px;
+    padding-left:42px;
+    transition:.3s;
+}
+
+.form-control:focus{
+    background:rgba(255,255,255,.25);
+    box-shadow:0 0 0 2px rgba(37,99,235,.4);
+    transform:scale(1.02);
+}
+
+.input-icon{
+    position:absolute;
+    left:14px;
+    top:50%;
+    transform:translateY(-50%);
+    color:#cbd5e1;
+}
+
+/* =============================
+   BUTTON
+============================= */
+
+.btn-login{
+    background:#2563eb;
+    border:none;
+    border-radius:14px;
+    padding:12px;
+    font-weight:500;
+    transition:.3s;
+}
+
+.btn-login:hover{
+    background:#1d4ed8;
+    transform:translateY(-2px);
+    box-shadow:0 10px 20px rgba(37,99,235,.4);
+}
+
+.btn-login:active{
+    transform:scale(.97);
+}
+
+/* =============================
+   LINKS
+============================= */
+
+.link-light{
+    color:#cbd5e1;
+    font-size:14px;
+    text-decoration:none;
+    transition:.2s;
+}
+.link-light:hover{
+    color:#fff;
+}
+
+/* =============================
+   STAGGER ANIMATION
+============================= */
+
+.login-card .mb-3,
+.login-card .btn-login,
+.login-card .text-center.mt-4{
+    opacity:0;
+    transform:translateY(15px);
+    animation: fadeItem .6s ease forwards;
+}
+
+.login-card .mb-3:nth-child(2){ animation-delay:.2s; }
+.login-card .mb-3:nth-child(3){ animation-delay:.35s; }
+.login-card .btn-login{ animation-delay:.5s; }
+.login-card .text-center.mt-4{ animation-delay:.7s; }
+
+@keyframes fadeItem{
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+</style>
 </head>
-<body class="bg-light">
 
-<div class="container">
-    <div class="row justify-content-center mt-5">
-        <div class="col-md-4">
+<body>
 
-            <div class="card shadow">
-                <div class="card-body">
+<div class="login-card">
 
-                    <h4 class="text-center mb-4">Acesso ao Sistema</h4>
-
-                    <form method="post">
-                        {% csrf_token %}
-
-                        {% if form.errors %}
-                            <div class="alert alert-danger">
-                                Usuário ou senha inválidos
-                            </div>
-                        {% endif %}
-
-                        <div class="mb-3">
-                            <label class="form-label">Usuário</label>
-                            {{ form.username }}
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Senha</label>
-                            {{ form.password }}
-                        </div>
-
-                        <button class="btn btn-primary w-100">
-                            Entrar
-                        </button>
-                    </form>
-
-                </div>
-            </div>
-
-        </div>
+    <div class="text-center mb-4">
+        <h3 class="fw-bold">🚀 Acesso ao Sistema</h3>
+        <p class="opacity-75">Entre para continuar</p>
     </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert alert-danger">
+                Usuário ou senha inválidos
+            </div>
+        {% endif %}
+
+        <!-- USERNAME -->
+        <div class="mb-3 position-relative">
+            <i class="bi bi-person input-icon"></i>
+            <input type="text"
+                   name="username"
+                   class="form-control"
+                   placeholder="Usuário"
+                   required
+                   value="{{ form.username.value|default:'' }}">
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="mb-3 position-relative">
+            <i class="bi bi-lock input-icon"></i>
+            <input type="password"
+                   name="password"
+                   id="password-field"
+                   class="form-control"
+                   placeholder="Senha"
+                   required>
+            <i class="bi bi-eye position-absolute end-0 top-50 translate-middle-y me-3"
+               style="cursor:pointer;color:#cbd5e1;"
+               onclick="togglePassword(this)"></i>
+        </div>
+
+        <div class="d-flex justify-content-between mb-3">
+            <div>
+                <input type="checkbox" class="form-check-input" id="remember">
+                <label for="remember" class="form-check-label small">Lembrar-me</label>
+            </div>
+            <a href="botao" class="link-light">
+            {% comment %} <a href="{% url 'password_reset' %}" class="link-light"> {% endcomment %}
+                Esqueceu a senha?
+            </a>
+        </div>
+
+        <button class="btn btn-login w-100">
+            Entrar
+        </button>
+    </form>
+
+    <div class="text-center mt-4">
+        <a href="#" class="link-light">Criar nova conta</a>
+    </div>
+
 </div>
+
+<script>
+function togglePassword(icon){
+    const field = document.getElementById('password-field');
+    if(field.type === "password"){
+        field.type = "text";
+        icon.classList.replace("bi-eye","bi-eye-slash");
+    } else {
+        field.type = "password";
+        icon.classList.replace("bi-eye-slash","bi-eye");
+    }
+}
+</script>
 
 </body>
 </html>

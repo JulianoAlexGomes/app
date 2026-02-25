@@ -1,0 +1,125 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Contas Bancárias{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+.card-dashboard{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}
+.table thead th{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    background:#f8f9fa;
+}
+.btn-icon{
+    width:34px;
+    height:34px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #dee2e6;
+    background:#fff;
+    transition:.2s;
+}
+.btn-icon:hover{ transform:scale(1.05); }
+.btn-primary-icon{ background:#0d6efd;color:#fff;border:none; }
+.btn-danger-icon{ background:#dc3545;color:#fff;border:none; }
+</style>
+
+<div class="container mt-4">
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Contas Bancárias</h4>
+    <a href="{% url 'bank_create' %}" class="btn-icon btn-primary-icon">
+        <i class="bi bi-plus-lg"></i>
+    </a>
+</div>
+
+<!-- TABELA -->
+<div class="card card-dashboard">
+<div class="table-responsive">
+<table class="table align-middle mb-0">
+<thead>
+<tr>
+    <th>Conta</th>
+    <th class="d-none d-md-table-cell">Banco</th>
+    <th class="d-none d-md-table-cell">Agência</th>
+    <th class="d-none d-md-table-cell">Número</th>
+    <th>Saldo</th>
+    <th class="text-center" width="110">Ações</th>
+</tr>
+</thead>
+<tbody>
+
+{% for bank in banks %}
+<tr>
+    <td>
+        <strong>{{ bank.name }}</strong>
+        <div class="d-md-none small text-muted">
+            🏦 {{ bank.bank_name }} <br>
+            Ag: {{ bank.agency_number }} | Cc: {{ bank.account_number }}
+        </div>
+    </td>
+
+    <td class="d-none d-md-table-cell">
+        {{ bank.bank_name }}
+    </td>
+
+    <td class="d-none d-md-table-cell">
+        {{ bank.agency_number }}
+    </td>
+
+    <td class="d-none d-md-table-cell">
+        {{ bank.account_number }}
+    </td>
+
+    <td>
+        {% if bank.calculated_balance < 0 %}
+            <span class="badge bg-danger">
+                R$ {{ bank.calculated_balance }}
+            </span>
+        {% else %}
+            <span class="badge bg-success">
+                R$ {{ bank.calculated_balance }}
+            </span>
+        {% endif %}
+    </td>
+
+    <td>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="{% url 'bank_update' bank.pk %}" class="btn-icon">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'bank_delete' bank.pk %}"
+               class="btn-icon btn-danger-icon"
+               onclick="return confirm('Excluir conta?');">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr>
+
+{% empty %}
+<tr>
+    <td colspan="6" class="text-center text-muted py-4">
+        Nenhuma conta cadastrada
+    </td>
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+{% endblock %}
