@@ -1,385 +1,398 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
-<head>
-<meta charset="UTF-8">
-<title>{% block title %}Sistema{% endblock %}</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <title>
+      {% block title %}Sistema{% endblock %}
+    </title>
 
-<style>
-:root{
-    --sidebar-width:260px;
-    --sidebar-mini:80px;
-    --transition:.3s;
-}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-body{
-    background:#f4f6f9;
-    overflow-x:hidden;
-    transition:var(--transition);
-}
+    <style>
+      :root {
+        --sidebar-width: 260px;
+        --sidebar-mini: 72px;
+        --transition: 0.3s ease;
+      }
 
-body.dark-mode{
-    background:#0f172a;
-    color:#e2e8f0;
-}
+      * { box-sizing: border-box; }
 
-.wrapper{
-    display:flex;
-}
+      body {
+        background: #f4f6f9;
+        overflow-x: hidden;
+      }
 
-#sidebar{
-    width:var(--sidebar-width);
-    min-height:100vh;
-    background:#111827;
-    color:#fff;
-    transition:var(--transition);
-    position:fixed;
-    overflow-y:auto;
-}
+      /* ===== OVERLAY (mobile) ===== */
+      #sidebarOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1039;
+      }
 
-#sidebar.sidebar-collapsed{
-    width:var(--sidebar-mini);
-}
+      #sidebarOverlay.active {
+        display: block;
+      }
 
-.sidebar-header{
-    padding:20px;
-    font-weight:600;
-    font-size:18px;
-    border-bottom:1px solid rgba(255,255,255,.05);
-}
+      /* ===== LAYOUT ===== */
+      .wrapper {
+        display: flex;
+      }
 
-.sidebar-menu a{
-    display:flex;
-    align-items:center;
-    padding:12px 20px;
-    color:#cbd5e1;
-    text-decoration:none;
-    transition:.2s;
-    font-size:14px;
-    position:relative;
-}
+      /* ===== SIDEBAR ===== */
+      #sidebar {
+        width: var(--sidebar-width);
+        min-height: 100vh;
+        background: #111827;
+        color: #fff;
+        transition: width var(--transition);
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        z-index: 1040;
+        scrollbar-width: none;
+      }
 
-.sidebar-menu a:hover{
-    background:#1f2937;
-    color:#fff;
-}
+      #sidebar::-webkit-scrollbar { display: none; }
 
-.sidebar-menu a.active{
-    background:#2563eb;
-    color:#fff;
-}
+      /* collapsed — desktop */
+      #sidebar.sidebar-collapsed {
+        width: var(--sidebar-mini);
+      }
 
-.sidebar-menu i{
-    font-size:18px;
-    width:22px;
-}
+      /* --- collapsed: hide text and chevron, center icons --- */
+      #sidebar.sidebar-collapsed .sidebar-text {
+        opacity: 0;
+        width: 0;
+        margin-left: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
 
-.sidebar-text{
-    margin-left:12px;
-    transition:.2s;
-}
+      /* chevron: hide AND remove from flow so it doesn't affect centering */
+      #sidebar.sidebar-collapsed .rotate {
+        display: none;
+      }
 
-#sidebar.sidebar-collapsed .sidebar-text{
-    display:none;
-}
+      #sidebar.sidebar-collapsed .sidebar-menu a {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+      }
 
-#sidebar.sidebar-collapsed .sidebar-menu a:hover::after{
-    content:attr(data-title);
-    position:absolute;
-    left:70px;
-    background:#000;
-    color:#fff;
-    padding:4px 8px;
-    border-radius:6px;
-    white-space:nowrap;
-    font-size:12px;
-}
+      /* submenus: visually hidden when collapsed (not hovering) */
+      #sidebar.sidebar-collapsed:not(:hover) .submenu {
+        visibility: hidden;
+        height: 0;
+        overflow: hidden;
+      }
 
-.submenu a{
-    padding-left:50px;
-    font-size:13px;
-}
+      /* hover expands on desktop */
+      @media (min-width: 992px) {
+        #sidebar.sidebar-collapsed:hover {
+          width: var(--sidebar-width);
+        }
 
-.rotate{
-    margin-left:auto;
-    transition:transform .3s ease;
-}
+        #sidebar.sidebar-collapsed:hover .sidebar-text {
+          opacity: 1;
+          width: auto;
+          margin-left: 12px;
+          pointer-events: auto;
+        }
 
-.rotate.open{
-    transform:rotate(90deg);
-}
+        #sidebar.sidebar-collapsed:hover .rotate {
+          display: inline-block;
+        }
 
-.topbar{
-    margin-left:var(--sidebar-width);
-    height:60px;
-    background:#fff;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 20px;
-    box-shadow:0 2px 8px rgba(0,0,0,.05);
-    transition:var(--transition);
-}
+        #sidebar.sidebar-collapsed:hover .sidebar-menu a {
+          justify-content: flex-start;
+          padding-left: 20px;
+          padding-right: 20px;
+        }
 
-body.dark-mode .topbar{
-    background:#1e293b;
-}
+        /* restore submenu visibility on hover — JS controls Bootstrap collapse open/close */
+        #sidebar.sidebar-collapsed:hover .submenu {
+          visibility: visible;
+          height: auto;
+        }
+      }
 
-.content{
-    margin-left:var(--sidebar-width);
-    padding:30px;
-    transition:var(--transition);
-}
+      /* tooltip on collapsed (desktop, no-hover) */
+      @media (min-width: 992px) {
+        #sidebar.sidebar-collapsed:not(:hover) .sidebar-menu > a[data-title]:hover::after {
+          content: attr(data-title);
+          position: absolute;
+          left: calc(var(--sidebar-mini) + 8px);
+          top: 50%;
+          transform: translateY(-50%);
+          background: #1f2937;
+          color: #fff;
+          padding: 5px 10px;
+          border-radius: 6px;
+          white-space: nowrap;
+          font-size: 13px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          z-index: 9999;
+          pointer-events: none;
+        }
+      }
 
-#sidebar.sidebar-collapsed ~ .main .topbar,
-#sidebar.sidebar-collapsed ~ .main .content{
-    margin-left:var(--sidebar-mini);
-}
+      /* mobile */
+      @media (max-width: 991px) {
+        #sidebar {
+          transform: translateX(-100%);
+          transition: transform var(--transition);
+          width: var(--sidebar-width) !important;
+        }
 
-.toggle-btn{
-    background:none;
-    border:none;
-    font-size:20px;
-    color:#fff;
-}
-</style>
-</head>
+        #sidebar.mobile-open {
+          transform: translateX(0);
+        }
+      }
 
-<body>
+      /* ===== SIDEBAR HEADER ===== */
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        font-weight: 600;
+        font-size: 17px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        min-height: 60px;
+        white-space: nowrap;
+      }
 
-<div class="wrapper">
+      .toggle-btn {
+        background: none;
+        border: none;
+        color: #cbd5e1;
+        font-size: 22px;
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+        line-height: 1;
+        transition: color 0.2s;
+      }
 
-<div id="sidebar">
+      .toggle-btn:hover { color: #fff; }
 
-    <div class="sidebar-header d-flex justify-content-between align-items-center">
-        <span class="sidebar-text">Sistema</span>
-        <button id="toggle-sidebar" class="toggle-btn">
+      /* ===== MENU ===== */
+      .sidebar-menu a {
+        display: flex;
+        align-items: center;
+        padding: 11px 20px;
+        color: #94a3b8;
+        text-decoration: none;
+        font-size: 14px;
+        position: relative;
+        transition: background 0.15s, color 0.15s;
+        white-space: nowrap;
+      }
+
+      .sidebar-menu a:hover {
+        background: #1f2937;
+        color: #fff;
+      }
+
+      .sidebar-menu a.active {
+        background: #2563eb;
+        color: #fff;
+      }
+
+      .sidebar-menu i:first-child {
+        font-size: 18px;
+        width: 22px;
+        text-align: center;
+        flex-shrink: 0;
+      }
+
+      .sidebar-text {
+        margin-left: 12px;
+        transition: opacity var(--transition), width var(--transition);
+        overflow: hidden;
+      }
+
+      .rotate {
+        margin-left: auto;
+        font-size: 13px;
+        transition: transform 0.25s ease, opacity var(--transition), width var(--transition);
+        flex-shrink: 0;
+      }
+
+      .rotate.open {
+        transform: rotate(90deg);
+      }
+
+      /* ===== SUBMENU ===== */
+      .submenu a {
+        padding-left: 54px;
+        font-size: 13px;
+        color: #64748b;
+      }
+
+      .submenu a:hover { color: #fff; }
+      .submenu a.active { color: #fff; background: #1d4ed8; }
+
+      /* ===== MAIN ===== */
+      .main {
+        flex: 1;
+        margin-left: var(--sidebar-width);
+        transition: margin-left var(--transition);
+        min-width: 0;
+      }
+
+      /* when sidebar is collapsed the main shifts */
+      .main.sidebar-collapsed-main {
+        margin-left: var(--sidebar-mini);
+      }
+
+      @media (max-width: 991px) {
+        .main {
+          margin-left: 0 !important;
+        }
+      }
+
+      .topbar {
+        height: 60px;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .content {
+        padding: 28px 30px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="sidebarOverlay"></div>
+
+    <div class="wrapper">
+      <!-- SIDEBAR -->
+      <div id="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-text">Sistema</span>
+          <button id="toggle-sidebar" class="toggle-btn" title="Recolher menu">
             <i class="bi bi-list"></i>
-        </button>
-    </div>
+          </button>
+        </div>
 
-    <div class="sidebar-menu">
-
-        <!-- DASHBOARD -->
-        <a href="{% url 'home' %}" 
-           data-title="Dashboard"
-           class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+        <div class="sidebar-menu">
+          <a href="{% url 'home' %}" data-title="Dashboard"
+             class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i>
             <span class="sidebar-text">Dashboard</span>
-        </a>
+          </a>
 
-        <!-- EMPRESA -->
-        <a href="{% url 'business_update' request.user.business.id %}" 
-           data-title="Empresa"
-           class="{% if 'business' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'business_update' request.user.business.id %}" data-title="Empresa"
+             class="{% if 'business' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-building"></i>
             <span class="sidebar-text">Empresa</span>
-        </a>
+          </a>
 
-        <!-- USUÁRIOS -->
-        <a href="{% url 'user_list' %}" 
-           data-title="Usuários"
-           class="{% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'user_list' %}" data-title="Usuários"
+             class="{% if 'user' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-person-gear"></i>
             <span class="sidebar-text">Usuários</span>
-        </a>
+          </a>
 
-        <!-- CLIENTES -->
-        <a href="{% url 'client_list' %}" 
-           data-title="Clientes"
-           class="{% if 'client' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'client_list' %}" data-title="Clientes"
+             class="{% if 'client' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-people"></i>
             <span class="sidebar-text">Clientes</span>
-        </a>
+          </a>
 
-        <!-- PEDIDOS -->
-        <a href="{% url 'order_list' %}" 
-           data-title="Pedidos"
-           class="{% if 'order' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'order_list' %}" data-title="Pedidos"
+             class="{% if 'order' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-bag"></i>
             <span class="sidebar-text">Pedidos</span>
-        </a>
+          </a>
 
-        <!-- ESTOQUE -->
-        <a data-bs-toggle="collapse" href="#estoqueMenu" data-title="Estoque" class="{% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %} active {% endif %}">
+          <!-- ESTOQUE -->
+          <a data-bs-toggle="collapse" href="#estoqueMenu" role="button" data-title="Estoque"
+             class="{% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-box-seam"></i>
             <span class="sidebar-text">Estoque</span>
             <i class="bi bi-chevron-right rotate"></i>
-        </a>
+          </a>
+          <div class="collapse submenu {% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %}show{% endif %}"
+               id="estoqueMenu">
+            <a href="{% url 'product_list' %}" class="{% if 'product' in request.resolver_match.url_name %}active{% endif %}">Produtos</a>
+            <a href="{% url 'colorchart_list' %}" class="{% if 'colorchart' in request.resolver_match.url_name %}active{% endif %}">Cores</a>
+            <a href="{% url 'modelchart_list' %}" class="{% if 'modelchart' in request.resolver_match.url_name %}active{% endif %}">Modelos</a>
+            <a href="{% url 'sizechart_list' %}" class="{% if 'sizechart' in request.resolver_match.url_name %}active{% endif %}">Tamanhos</a>
+          </div>
 
-        <div class="collapse submenu {% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %} show {% endif %}" id="estoqueMenu">
-
-            <a href="{% url 'product_list' %}" 
-               class="{% if 'product' in request.resolver_match.url_name %}active{% endif %}">
-               Produtos
-            </a>
-
-            <a href="{% url 'colorchart_list' %}" 
-               class="{% if 'colorchart' in request.resolver_match.url_name %}active{% endif %}">
-               Cores
-            </a>
-
-            <a href="{% url 'modelchart_list' %}" 
-               class="{% if 'modelchart' in request.resolver_match.url_name %}active{% endif %}">
-               Modelos
-            </a>
-
-            <a href="{% url 'sizechart_list' %}" 
-               class="{% if 'sizechart' in request.resolver_match.url_name %}active{% endif %}">
-               Tamanhos
-            </a>
-
-        </div>
-
-        <!-- FINANCEIRO -->
-        <a data-bs-toggle="collapse" href="#financeiroMenu" data-title="Financeiro" class="{% if 'financial' in request.resolver_match.url_name or 'bank' in request.resolver_match.url_name or 'paymentmethod' in request.resolver_match.url_name %}active {% endif %}">
-            <i class="bi bi-cash-stack"></i>
-            <span class="sidebar-text">Financeiro</span>
+          <!-- FISCAL -->
+          <a data-bs-toggle="collapse" href="#configFiscal" role="button" data-title="Fiscal"
+             class="{% if 'ncm' in request.resolver_match.url_name or 'operation' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-receipt"></i>
+            <span class="sidebar-text">Fiscal</span>
             <i class="bi bi-chevron-right rotate"></i>
-        </a>
+          </a>
+          <div class="collapse submenu {% if 'ncm' in request.resolver_match.url_name or 'operation' in request.resolver_match.url_name %}show{% endif %}"
+               id="configFiscal">
+            <a href="{% url 'ncm_group_list' %}" class="{% if 'ncm_group' in request.resolver_match.url_name %}active{% endif %}">Grupos NCM</a>
+            <a href="{% url 'operation_list' %}" class="{% if 'operation' in request.resolver_match.url_name %}active{% endif %}">Operações Fiscais</a>
+          </div>
 
-        <div class="collapse submenu {% if 'financial' in request.resolver_match.url_name or 'bank' in request.resolver_match.url_name or 'paymentmethod' in request.resolver_match.url_name %} show {% endif %}" id="financeiroMenu">
-
-            <a href="{% url 'financial_list' %}" 
-               class="{% if 'financial' in request.resolver_match.url_name %}active{% endif %}">
-               Financeiro
-            </a>
-
-            <a href="{% url 'paymentmethod_list' %}" 
-               class="{% if 'paymentmethod' in request.resolver_match.url_name %}active{% endif %}">
-               Formas de Pagamento
-            </a>
-
-            <a href="{% url 'bank_list' %}" 
-               class="{% if 'bank' in request.resolver_match.url_name %}active{% endif %}">
-               Contas Bancárias
-            </a>
-
-        </div>
-
-        <!-- CONFIGURAÇÕES -->
-            {% comment %} <a data-bs-toggle="collapse"
-            href="#configuracoesMenu"
-            data-title="Configurações"
-            class="{% if 'ncm' in request.resolver_match.url_name %}active{% endif %}">
-
-                <i class="bi bi-gear"></i>
-                <span class="sidebar-text">Configurações</span>
-                <i class="bi bi-chevron-right rotate"></i>
-            </a> {% endcomment %}
-
-            <div class="collapse submenu {% if 'ncm' in request.resolver_match.url_name %}show{% endif %}"
-                id="configuracoesMenu">
-
-            </div>
-
-            <a data-bs-toggle="collapse" href="#configFiscal" data-title="Fiscal">
-                <i class="bi bi-receipt"></i>
-                <span class="sidebar-text">Fiscal</span>
-                <i class="bi bi-chevron-right rotate"></i>
-            </a>
-
-            <div class="collapse submenu" id="configFiscal">
-
-                <a href="{% url 'ncm_group_list' %}">
-                    Grupos NCM
-                </a>
-
-                <a href="{% url 'operation_list' %}">
-                    Operações Fiscais
-                </a>
-
-            </div>
-
-
-        <form action="{% url 'logout' %}" method="post" id="logout-form" class="d-none">
+          <!-- LOGOUT -->
+          <form action="{% url 'logout' %}" method="post" id="logout-form" class="d-none">
             {% csrf_token %}
-        </form>
-
-        <a href="#" onclick="document.getElementById('logout-form').submit(); return false;">
+          </form>
+          <a href="#" data-title="Sair" onclick="document.getElementById('logout-form').submit(); return false;">
             <i class="bi bi-box-arrow-right"></i>
             <span class="sidebar-text">Sair</span>
-        </a>
+          </a>
+        </div>
+      </div>
 
-    </div>
-</div>
+      <!-- MAIN -->
+      <div class="main" id="main">
+        <div class="topbar">
+          <div class="d-flex align-items-center gap-3">
+            <!-- mobile toggle inside topbar -->
+            <button id="mobile-toggle" class="btn btn-sm btn-light d-lg-none">
+              <i class="bi bi-list fs-5"></i>
+            </button>
+            <strong>{{ request.user.business.name }}</strong>
+          </div>
+          <span class="text-muted small">{{ request.user.username }}</span>
+        </div>
 
-<div class="main flex-grow-1">
-
-    <div class="topbar">
-        <strong>{{ request.user.business.name }}</strong>
-        <span>{{ request.user.username }}</span>
-    </div>
-
-    <div class="content">
-    {% if messages %}
-    <div class="container mt-3">
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        <div class="content">
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
                 {{ message }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        {% endfor %}
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          {% block content %}{% endblock %}
+        </div>
+      </div>
     </div>
-    {% endif %}
-        {% block content %}{% endblock %}
-    </div>
 
-</div>
-
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-
-    const sidebar=document.getElementById('sidebar');
-    const toggle=document.getElementById('toggle-sidebar');
-    const darkBtn=document.getElementById('darkToggle');
-
-    if(localStorage.getItem('sidebar')==='collapsed'){
-        sidebar.classList.add('sidebar-collapsed');
-    }
-
-    toggle.addEventListener('click',function(){
-        sidebar.classList.toggle('sidebar-collapsed');
-        localStorage.setItem('sidebar',
-            sidebar.classList.contains('sidebar-collapsed')?'collapsed':'open'
-        );
-    });
-
-    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn=>{
-        const icon=btn.querySelector('.rotate');
-        const target=document.querySelector(btn.getAttribute('href'));
-
-        target.addEventListener('show.bs.collapse',()=>icon.classList.add('open'));
-        target.addEventListener('hide.bs.collapse',()=>icon.classList.remove('open'));
-
-        if(target.classList.contains('show')){
-            icon.classList.add('open');
-        }
-    });
-
-    if(localStorage.getItem('dark')==='on'){
-        document.body.classList.add('dark-mode');
-    }
-
-    if(darkBtn){
-        darkBtn.addEventListener('click',function(){
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('dark',
-                document.body.classList.contains('dark-mode')?'on':'off'
-            );
-        });
-    }
-
-});
-</script>
-
-{% block extra_js %}{% endblock %}
-
-</body>
+    <script src="{% static 'js/base.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+  </body>
 </html>
