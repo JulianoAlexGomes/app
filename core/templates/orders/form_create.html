@@ -1,20 +1,183 @@
 {% extends 'base/base.html' %}
+{% load static %}
 
 {% block title %}Novo Pedido{% endblock %}
 
 {% block content %}
-<h2>Novo Pedido</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Novo Pedido</h2>
+    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">← Voltar</a>
+</div>
 
 <form method="post">
     {% csrf_token %}
 
-    <div class="card p-3 mb-3">
-        <label class="form-label">Cliente</label>
-        {{ form.client }}
+    <div class="row g-4">
+
+        <!-- ===== TIPO DE DOCUMENTO ===== -->
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light fw-semibold">
+                    📄 Tipo de Documento Fiscal
+                </div>
+                <div class="card-body">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label class="doc-card w-100 cursor-pointer">
+                                <input type="radio"
+                                       name="document_model"
+                                       value="55"
+                                       class="doc-radio d-none"
+                                       {% if form.document_model.value == '55' or not form.document_model.value %}checked{% endif %}>
+                                <div class="doc-option p-4 rounded-3 border-2 border text-center h-100
+                                            {% if form.document_model.value == '55' or not form.document_model.value %}doc-selected{% endif %}"
+                                     data-value="55">
+                                    <div class="fs-1 mb-2">🧾</div>
+                                    <h5 class="fw-bold mb-1">NF-e</h5>
+                                    <p class="text-muted small mb-0">
+                                        Nota Fiscal Eletrônica<br>
+                                        Modelo 55 — Venda para pessoa jurídica ou física com CPF
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="doc-card w-100 cursor-pointer">
+                                <input type="radio"
+                                       name="document_model"
+                                       value="65"
+                                       class="doc-radio d-none"
+                                       {% if form.document_model.value == '65' %}checked{% endif %}>
+                                <div class="doc-option p-4 rounded-3 border-2 border text-center h-100
+                                            {% if form.document_model.value == '65' %}doc-selected{% endif %}"
+                                     data-value="65">
+                                    <div class="fs-1 mb-2">🛒</div>
+                                    <h5 class="fw-bold mb-1">NFC-e</h5>
+                                    <p class="text-muted small mb-0">
+                                        Nota Fiscal de Consumidor Eletrônica<br>
+                                        Modelo 65 — Venda no balcão / PDV
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+
+                    </div>
+
+                    {% if form.document_model.errors %}
+                        <div class="text-danger small mt-2">{{ form.document_model.errors }}</div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CLIENTE ===== -->
+        <div class="col-12" id="cliente-section">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light fw-semibold">
+                    👤 Cliente / Destinatário
+                </div>
+                <div class="card-body">
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Cliente</label>
+                            {{ form.client }}
+                            {% if form.client.errors %}
+                                <div class="text-danger small">{{ form.client.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- NFC-e: aviso consumidor final -->
+                        <div class="col-md-4 d-flex align-items-end" id="nfce-tip" style="display:none!important">
+                            <div class="alert alert-info w-100 mb-0 small py-2">
+                                ℹ️ Na NFC-e o cliente é <strong>opcional</strong>
+                                (consumidor final sem identificação).
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <button class="btn btn-primary">
-        Criar Pedido
-    </button>
+    <div class="d-flex justify-content-end mt-4">
+        <button type="submit" class="btn btn-primary btn-lg px-5 fw-semibold">
+            Criar Pedido →
+        </button>
+    </div>
+
 </form>
+
+<style>
+.cursor-pointer { cursor: pointer; }
+
+.doc-option {
+    transition: all .2s ease;
+    border-color: #dee2e6 !important;
+    background: #fff;
+}
+
+.doc-option:hover {
+    border-color: #2563eb !important;
+    background: #f0f5ff;
+}
+
+.doc-selected {
+    border-color: #2563eb !important;
+    background: #eff6ff !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const radios   = document.querySelectorAll('.doc-radio');
+    const options  = document.querySelectorAll('.doc-option');
+    const nfceTip  = document.getElementById('nfce-tip');
+
+    function updateSelection() {
+        radios.forEach(function (radio) {
+            const opt = radio.closest('label').querySelector('.doc-option');
+            if (radio.checked) {
+                opt.classList.add('doc-selected');
+                // NFC-e: mostra aviso cliente opcional
+                if (radio.value === '65') {
+                    nfceTip.style.removeProperty('display');
+                } else {
+                    nfceTip.style.display = 'none';
+                }
+            } else {
+                opt.classList.remove('doc-selected');
+            }
+        });
+    }
+
+    radios.forEach(function (radio) {
+        radio.addEventListener('change', updateSelection);
+    });
+
+    // Clique no card também seleciona o radio
+    options.forEach(function (opt) {
+        opt.addEventListener('click', function () {
+            const val   = opt.dataset.value;
+            const radio = document.querySelector(`.doc-radio[value="${val}"]`);
+            if (radio) {
+                radio.checked = true;
+                updateSelection();
+            }
+        });
+    });
+
+    updateSelection();
+});
+</script>
+
 {% endblock %}

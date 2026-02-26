@@ -317,11 +317,14 @@ class StockEntryForm(forms.ModelForm):
             }),
         }
 
+# Substitua a classe OrderForm no seu forms.py por esta versão
+
 class OrderForm(forms.ModelForm):
     class Meta:
         model = Orders
-        fields = ['client']
+        fields = ['document_model', 'client']
         widgets = {
+            'document_model': forms.RadioSelect(),   # renderizado via cards no template
             'client': forms.Select(attrs={'class': 'form-control'}),
         }
 
@@ -329,14 +332,23 @@ class OrderForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # document_model obrigatório apenas na criação
+        self.fields['document_model'].required = not bool(
+            self.instance and self.instance.pk
+        )
+
         if user:
             qs = Client.objects.filter(business=user.business)
 
-            # 🔥 GARANTE que o client atual do pedido esteja no queryset
+            # garante que o cliente atual do pedido esteja no queryset
             if self.instance.pk and self.instance.client:
                 qs = qs | Client.objects.filter(pk=self.instance.client.pk)
 
             self.fields['client'].queryset = qs
+
+        # Na edição, bloqueia alteração do modelo de documento
+        if self.instance and self.instance.pk:
+            self.fields['document_model'].disabled = True
 
 
 class OrderItemForm(forms.ModelForm):
@@ -497,6 +509,9 @@ class ParcelPayForm(forms.ModelForm):
         return instance
 
 from django.forms import inlineformset_factory
+
+from decimal import Decimal, InvalidOperation
+from django import forms
 
 class OrderPaymentForm(forms.ModelForm):
     class Meta:
