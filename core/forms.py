@@ -482,37 +482,58 @@ class BankAccountForm(forms.ModelForm):
             'account_number': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+# forms.py — substitua ParcelPayForm
+
 class ParcelPayForm(forms.ModelForm):
 
+    bank = forms.ModelChoiceField(
+        queryset=BankAccount.objects.none(),
+        required=False,
+        label='Banco',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    payment_method = forms.ModelChoiceField(
+        queryset=PaymentMethod.objects.none(),
+        required=False,
+        label='Forma de pagamento',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
     class Meta:
-        model = FinancialMovementParcel
+        model  = FinancialMovementParcel
         fields = ['paydate']
         widgets = {
-            'paydate': forms.DateInput(
-                attrs={
-                    'type': 'date',
-                    'class': 'form-control'
-                }
-            )
+            'paydate': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
-        labels = {
-            'paydate': 'Data do pagamento'
-        }
+        labels = {'paydate': 'Data do pagamento'}
 
     def save(self, commit=True):
-        instance = super().save(commit=False)
+        instance       = super().save(commit=False)
         instance.payed = True
+
+        # Atualiza banco e/ou forma de pagamento na movement se informados
+        movement_changed = False
+
+        bank = self.cleaned_data.get('bank')
+        if bank:
+            instance.movement.bank = bank
+            movement_changed = True
+
+        payment_method = self.cleaned_data.get('payment_method')
+        if payment_method:
+            instance.movement.payment_method = payment_method
+            movement_changed = True
+
+        if movement_changed:
+            instance.movement.save(update_fields=[
+                f for f in ['bank', 'payment_method']
+                if self.cleaned_data.get(f)
+            ])
 
         if commit:
             instance.save()
-
         return instance
-
-from django.forms import inlineformset_factory
-
-from decimal import Decimal, InvalidOperation
-from django import forms
-
 class OrderPaymentForm(forms.ModelForm):
     class Meta:
         model = OrderPayment
@@ -708,3 +729,175 @@ class FiscalOperationForm(forms.ModelForm):
             'cofins_cst': forms.TextInput(attrs={'class': 'form-control'}),
             'cofins_rate': forms.NumberInput(attrs={'class': 'form-control'}),
         }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUBSTITUA o bloco de Invoice forms no final de core/forms.py
+# ─────────────────────────────────────────────────────────────────────────────
+# ===== INVOICE FORMS =====
+
+from django import forms
+from django.forms import inlineformset_factory, BaseInlineFormSet
+from decimal import Decimal
+from .models import Invoice, InvoiceItem, InvoicePayment
+
+
+PAYMENT_CHOICES = [
+    ('01', 'Dinheiro'),       ('02', 'Cheque'),
+    ('03', 'Cartão Crédito'), ('04', 'Cartão Débito'),
+    ('05', 'Crédito Loja'),   ('10', 'Vale Alimentação'),
+    ('11', 'Vale Refeição'),  ('12', 'Vale Presente'),
+    ('13', 'Vale Combustível'),('14', 'Duplicata'),
+    ('15', 'Boleto'),         ('16', 'Depósito'),
+    ('17', 'PIX'),            ('90', 'Sem Pagamento'),
+    ('99', 'Outros'),
+]
+
+
+class InvoiceForm(forms.ModelForm):
+    """Dados gerais, destinatário, totais e info adicionais da NF."""
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'nature_operation', 'finality', 'presence_indicator',
+            'operation_type', 'exit_date',
+            'dest_name', 'dest_cnpj', 'dest_cpf', 'dest_ie',
+            'dest_taxpayer_type', 'dest_email',
+            'dest_street', 'dest_number', 'dest_complement',
+            'dest_neighborhood', 'dest_city', 'dest_state', 'dest_zip_code',
+            'total_products', 'total_discount', 'total_freight',
+            'total_insurance', 'total_other', 'total_nf',
+            'additional_info', 'fiscal_info',
+        ]
+        widgets = {
+            'nature_operation':   forms.TextInput(attrs={'class': 'form-control'}),
+            'finality':           forms.Select(attrs={'class': 'form-select'}),
+            'presence_indicator': forms.Select(attrs={'class': 'form-select'}),
+            'operation_type':     forms.Select(attrs={'class': 'form-select'}),
+            'exit_date':          forms.DateTimeInput(
+                                    format='%Y-%m-%dT%H:%M',
+                                    attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'dest_name':          forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_cnpj':          forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_cpf':           forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_ie':            forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_taxpayer_type': forms.Select(attrs={'class': 'form-select'}),
+            'dest_email':         forms.EmailInput(attrs={'class': 'form-control'}),
+            'dest_street':        forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_number':        forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_complement':    forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_neighborhood':  forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_city':          forms.TextInput(attrs={'class': 'form-control'}),
+            'dest_state':         forms.TextInput(attrs={'class': 'form-control', 'maxlength': '2'}),
+            'dest_zip_code':      forms.TextInput(attrs={'class': 'form-control'}),
+            'total_products':     forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'total_discount':     forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'total_freight':      forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'total_insurance':    forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'total_other':        forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'total_nf':           forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'additional_info':    forms.Textarea(attrs={'class': 'form-control', 'rows': '3'}),
+            'fiscal_info':        forms.Textarea(attrs={'class': 'form-control', 'rows': '2'}),
+        }
+
+
+class InvoiceItemEditForm(forms.ModelForm):
+    """
+    Edição de item da NF.
+    gross_total é calculado automaticamente pelo save() via clean().
+    Campos com max_digits/decimal_places específicos recebem step adequado.
+    """
+
+    class Meta:
+        model = InvoiceItem
+        fields = [
+            # Produto
+            'description', 'ncm', 'cfop', 'unit',
+            # Quantidades (gross_total calculado no save)
+            'quantity', 'unit_price', 'discount',
+            # ICMS
+            'icms_cst', 'icms_csosn', 'icms_rate', 'icms_bc', 'icms_value',
+            # PIS / COFINS
+            'pis_cst', 'cofins_cst',
+        ]
+        widgets = {
+            'description': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'ncm':         forms.TextInput(attrs={'class': 'form-control form-control-sm', 'style': 'width:100px', 'maxlength': '8'}),
+            'cfop':        forms.TextInput(attrs={'class': 'form-control form-control-sm', 'style': 'width:65px', 'maxlength': '4'}),
+            'unit':        forms.TextInput(attrs={'class': 'form-control form-control-sm', 'style': 'width:55px', 'maxlength': '6'}),
+            # DecimalField(max_digits=15, decimal_places=4) → step 0.0001
+            'quantity':    forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-center',
+                'style': 'width:80px', 'step': '0.0001', 'min': '0',
+            }),
+            # DecimalField(max_digits=15, decimal_places=10) → step 0.01 é suficiente
+            'unit_price':  forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-end',
+                'style': 'width:95px', 'step': '0.01', 'min': '0',
+            }),
+            'discount':    forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-end',
+                'style': 'width:88px', 'step': '0.01', 'min': '0',
+            }),
+            'icms_cst':    forms.TextInput(attrs={'class': 'form-control form-control-sm text-center', 'style': 'width:58px', 'maxlength': '3'}),
+            'icms_csosn':  forms.TextInput(attrs={'class': 'form-control form-control-sm text-center', 'style': 'width:58px', 'maxlength': '3'}),
+            # DecimalField(max_digits=7, decimal_places=4)
+            'icms_rate':   forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-center',
+                'style': 'width:70px', 'step': '0.0001', 'min': '0', 'max': '100',
+            }),
+            'icms_bc':     forms.NumberInput(attrs={'class': 'form-control form-control-sm text-end', 'style': 'width:95px', 'step': '0.01', 'min': '0'}),
+            'icms_value':  forms.NumberInput(attrs={'class': 'form-control form-control-sm text-end', 'style': 'width:95px', 'step': '0.01', 'min': '0'}),
+            'pis_cst':     forms.TextInput(attrs={'class': 'form-control form-control-sm text-center', 'style': 'width:55px', 'maxlength': '2'}),
+            'cofins_cst':  forms.TextInput(attrs={'class': 'form-control form-control-sm text-center', 'style': 'width:55px', 'maxlength': '2'}),
+        }
+
+    def save(self, commit=True):
+        """Calcula gross_total = quantity * unit_price antes de salvar."""
+        item = super().save(commit=False)
+
+        qty        = self.cleaned_data.get('quantity') or Decimal('0')
+        unit_price = self.cleaned_data.get('unit_price') or Decimal('0')
+
+        # gross_total = qtd × preço unitário (sem desconto — desconto é campo separado)
+        item.gross_total = (qty * unit_price).quantize(Decimal('0.01'))
+
+        if commit:
+            item.save()
+        return item
+
+
+class InvoicePaymentEditForm(forms.ModelForm):
+
+    class Meta:
+        model = InvoicePayment
+        fields = ['payment_code', 'value']
+        widgets = {
+            'payment_code': forms.Select(
+                choices=PAYMENT_CHOICES,
+                attrs={'class': 'form-select form-select-sm'},
+            ),
+            'value': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-end',
+                'step': '0.01', 'min': '0',
+            }),
+        }
+
+
+# ─── FormSets ────────────────────────────────────────────────────────────────
+
+InvoiceItemFormSet = inlineformset_factory(
+    Invoice,
+    InvoiceItem,
+    form=InvoiceItemEditForm,
+    extra=0,
+    can_delete=True,
+)
+
+InvoicePaymentFormSet = inlineformset_factory(
+    Invoice,
+    InvoicePayment,
+    form=InvoicePaymentEditForm,
+    extra=1,
+    can_delete=True,
+)

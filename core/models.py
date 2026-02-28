@@ -780,9 +780,6 @@ class FinancialMovementParcel(models.Model):
     def subtotal(self):
         return self.value - self.discount + self.addition
 
-from decimal import Decimal
-
-from decimal import Decimal
 
 class OrderPayment(models.Model):
     order = models.ForeignKey(
@@ -1008,3 +1005,526 @@ class FiscalOperation(models.Model):
 
     def __str__(self):
         return f"{self.cfop} - {self.name}"
+
+        """
+fiscal/models.py
+
+Models de NF-e / NFC-e integrados com o projeto existente.
+
+Referências ao projeto:
+  core.Business    → emitente (nfe_last_number, certificate_file, tax_regime, etc.)
+  core.Orders      → pedido origem (document_model, nature_operation, freight_mode, etc.)
+  core.OrderItem   → itens com campos fiscais já preenchidos por apply_fiscal_rules
+  core.OrderPayment → pagamentos com PaymentMethod.payment_type (códigos SEFAZ)
+  core.Client      → destinatário com city_ibge, taxpayer_type, etc.
+
+Novos models:
+  Invoice          → cabeçalho snapshot da NF (imutável após autorização)
+  InvoiceItem      → snapshot dos itens do pedido
+  InvoicePayment   → snapshot dos pagamentos
+  InvoiceTransport → dados de frete / transportadora
+  InvoiceEvent     → cancelamento, carta de correção
+  InvoiceLog       → log imutável de todas as transmissões
+"""
+
+import uuid
+from django.db import models
+from django.utils import timezone
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CHOICES
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceStatus(models.TextChoices):
+    RASCUNHO    = 'RASCUNHO',    'Rascunho'
+    PENDENTE    = 'PENDENTE',    'Pendente de Transmissão'
+    AUTORIZADA  = 'AUTORIZADA',  'Autorizada'
+    REJEITADA   = 'REJEITADA',   'Rejeitada'
+    CANCELADA   = 'CANCELADA',   'Cancelada'
+    INUTILIZADA = 'INUTILIZADA', 'Inutilizada'
+    DENEGADA    = 'DENEGADA',    'Denegada'
+
+
+class InvoiceModel(models.TextChoices):
+    NFE  = '55', 'NF-e (55)'
+    NFCE = '65', 'NFC-e (65)'
+
+
+class TipoEmissao(models.TextChoices):
+    NORMAL       = '1', 'Emissão Normal'
+    CONTINGENCIA = '9', 'Contingência Off-line'
+
+
+class ModalidadeFrete(models.TextChoices):
+    EMITENTE     = '0', 'Remetente (CIF)'
+    DESTINATARIO = '1', 'Destinatário (FOB)'
+    TERCEIROS    = '2', 'Terceiros'
+    PROPRIO_EMIT = '3', 'Próprio – Emitente'
+    PROPRIO_DEST = '4', 'Próprio – Destinatário'
+    SEM_FRETE    = '9', 'Sem Frete'
+
+
+class TipoEvento(models.TextChoices):
+    CANCELAMENTO = '110111', 'Cancelamento'
+    CARTA_CORR   = '110110', 'Carta de Correção'
+    INUTILIZACAO = '110112', 'Inutilização'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE — Cabeçalho da NF (snapshot imutável após transmissão)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Invoice(models.Model):
+    """
+    Cabeçalho da NF-e / NFC-e.
+    Criado ao clicar em "Gerar NF-e" no pedido faturado.
+    Todos os campos do emitente e destinatário são snapshot do
+    momento da emissão — não mudam se o Business/Client for editado depois.
+    """
+
+    uid    = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
+    # Pedido de origem — PROTECT para não perder a NF se o pedido for deletado
+    order  = models.ForeignKey(
+        'core.Orders',
+        on_delete=models.PROTECT,
+        related_name='invoices',
+        verbose_name='Pedido'
+    )
+
+    # ── Identificação ──────────────────────────────────────────────────────
+    model         = models.CharField('Modelo', max_length=2,
+                                     choices=InvoiceModel.choices)
+    serie         = models.CharField('Série', max_length=3)
+    number        = models.PositiveIntegerField('Número')
+    code_nf       = models.CharField('cNF (8 dígitos)', max_length=8, blank=True)
+    access_key    = models.CharField('Chave de Acesso', max_length=44,
+                                     blank=True, db_index=True)
+    dv            = models.PositiveSmallIntegerField('Dígito Verificador',
+                                                     null=True, blank=True)
+
+    # ── Ambiente / Emissão ─────────────────────────────────────────────────
+    # Espelha Business.nfe_environment no momento da geração
+    environment   = models.CharField('Ambiente', max_length=1,
+                                     choices=[('1', 'Produção'), ('2', 'Homologação')])
+    emission_type = models.CharField('Tipo de Emissão', max_length=1,
+                                     choices=TipoEmissao.choices,
+                                     default=TipoEmissao.NORMAL)
+
+    # ── Datas ──────────────────────────────────────────────────────────────
+    issue_date    = models.DateTimeField('Data de Emissão', default=timezone.now)
+    exit_date     = models.DateTimeField('Data de Saída/Entrada', null=True, blank=True)
+
+    # ── Operação (espelha campos de Orders) ───────────────────────────────
+    nature_operation   = models.CharField('Natureza da Operação', max_length=60)
+    operation_type     = models.CharField('Tipo Operação', max_length=1,
+                                          choices=[('0', 'Entrada'), ('1', 'Saída')],
+                                          default='1')
+    finality           = models.CharField('Finalidade', max_length=1,
+                                          choices=[('1', 'Normal'), ('2', 'Complementar'),
+                                                   ('3', 'Ajuste'), ('4', 'Devolução')],
+                                          default='1')
+    presence_indicator = models.CharField('Indicador de Presença', max_length=1,
+                                          choices=[('0', 'Não se aplica'),
+                                                   ('1', 'Presencial'),
+                                                   ('2', 'Internet'),
+                                                   ('3', 'Teleatendimento'),
+                                                   ('9', 'Outros')],
+                                          default='0')
+
+    # ── Emitente — snapshot de Business ───────────────────────────────────
+    emit_name         = models.CharField('Razão Social', max_length=255)
+    emit_fantasy      = models.CharField('Fantasia', max_length=255, blank=True)
+    emit_cnpj         = models.CharField('CNPJ', max_length=14)       # apenas dígitos
+    emit_ie           = models.CharField('IE', max_length=20, blank=True)
+    emit_im           = models.CharField('IM', max_length=20, blank=True)
+    # 1=Simples, 2=Simples Excesso, 3=Normal — espelha Business.tax_regime
+    emit_tax_regime   = models.CharField('Regime Tributário', max_length=1,
+                                         choices=[('1', 'Simples Nacional'),
+                                                  ('2', 'Simples Nacional – Excesso'),
+                                                  ('3', 'Regime Normal')])
+    emit_street       = models.CharField('Logradouro', max_length=255)
+    emit_number       = models.CharField('Número', max_length=20)
+    emit_complement   = models.CharField('Complemento', max_length=60, blank=True)
+    emit_district     = models.CharField('Bairro', max_length=60)
+    emit_city         = models.CharField('Cidade', max_length=60)
+    emit_city_code    = models.CharField('IBGE Município', max_length=7)
+    emit_state        = models.CharField('UF', max_length=2)
+    emit_zip_code     = models.CharField('CEP', max_length=8)          # apenas dígitos
+    emit_country_code = models.CharField('Cód. País', max_length=4, default='1058')
+    emit_phone        = models.CharField('Fone', max_length=14, blank=True)
+
+    # ── Destinatário — snapshot de Client ─────────────────────────────────
+    dest_name          = models.CharField('Nome', max_length=255)
+    dest_cnpj          = models.CharField('CNPJ', max_length=14, blank=True)
+    dest_cpf           = models.CharField('CPF', max_length=11, blank=True)
+    dest_ie            = models.CharField('IE', max_length=20, blank=True)
+    # Espelha Client.taxpayer_type
+    dest_taxpayer_type = models.CharField('Indicador IE', max_length=1,
+                                          choices=[('1', 'Contribuinte'),
+                                                   ('2', 'Isento'),
+                                                   ('9', 'Não Contribuinte')],
+                                          default='9')
+    dest_email         = models.EmailField('E-mail', blank=True)
+    dest_phone         = models.CharField('Fone', max_length=14, blank=True)
+    dest_street        = models.CharField('Logradouro', max_length=255, blank=True)
+    dest_number        = models.CharField('Número', max_length=20, blank=True)
+    dest_complement    = models.CharField('Complemento', max_length=60, blank=True)
+    dest_neighborhood  = models.CharField('Bairro', max_length=60, blank=True)
+    dest_city          = models.CharField('Cidade', max_length=60, blank=True)
+    dest_city_code     = models.CharField('IBGE Município', max_length=7, blank=True)  # Client.city_ibge
+    dest_state         = models.CharField('UF', max_length=2, blank=True)
+    dest_zip_code      = models.CharField('CEP', max_length=8, blank=True)
+    dest_country_code  = models.CharField('Cód. País', max_length=4, default='1058')
+    dest_country       = models.CharField('País', max_length=60, default='Brasil')
+
+    # ── Totais ─────────────────────────────────────────────────────────────
+    total_products    = models.DecimalField('Produtos', max_digits=15, decimal_places=2, default=0)
+    total_discount    = models.DecimalField('Desconto', max_digits=15, decimal_places=2, default=0)
+    total_freight     = models.DecimalField('Frete', max_digits=15, decimal_places=2, default=0)
+    total_insurance   = models.DecimalField('Seguro', max_digits=15, decimal_places=2, default=0)
+    total_other       = models.DecimalField('Outras Desp.', max_digits=15, decimal_places=2, default=0)
+    total_bc_icms     = models.DecimalField('BC ICMS', max_digits=15, decimal_places=2, default=0)
+    total_icms        = models.DecimalField('ICMS', max_digits=15, decimal_places=2, default=0)
+    total_bc_st       = models.DecimalField('BC ST', max_digits=15, decimal_places=2, default=0)
+    total_icms_st     = models.DecimalField('ICMS ST', max_digits=15, decimal_places=2, default=0)
+    total_ipi         = models.DecimalField('IPI', max_digits=15, decimal_places=2, default=0)
+    total_pis         = models.DecimalField('PIS', max_digits=15, decimal_places=2, default=0)
+    total_cofins      = models.DecimalField('COFINS', max_digits=15, decimal_places=2, default=0)
+    total_nf          = models.DecimalField('Total NF', max_digits=15, decimal_places=2, default=0)
+
+    # ── Informações adicionais ─────────────────────────────────────────────
+    additional_info   = models.TextField('Informações Complementares', blank=True)
+    fiscal_info       = models.TextField('Informações ao Fisco', blank=True)
+
+    # ── Status e transmissão ───────────────────────────────────────────────
+    status         = models.CharField('Status', max_length=20,
+                                      choices=InvoiceStatus.choices,
+                                      default=InvoiceStatus.RASCUNHO,
+                                      db_index=True)
+    protocol       = models.CharField('Protocolo', max_length=60, blank=True)
+    authorized_at  = models.DateTimeField('Data Autorização', null=True, blank=True)
+    return_code    = models.CharField('Código Retorno SEFAZ', max_length=10, blank=True)
+    return_message = models.TextField('Mensagem Retorno', blank=True)
+
+    # ── XMLs ───────────────────────────────────────────────────────────────
+    xml_sent       = models.TextField('XML Enviado', blank=True)
+    xml_return     = models.TextField('XML Retorno', blank=True)
+    xml_cancel     = models.TextField('XML Cancelamento', blank=True)
+    pdf_danfe      = models.FileField('DANFE PDF', upload_to='danfe/', null=True, blank=True)
+
+    # ── NF referenciada (devolução, complementar, etc.) ───────────────────
+    ref_invoice    = models.ForeignKey('self', null=True, blank=True,
+                                       on_delete=models.SET_NULL,
+                                       related_name='derived_invoices',
+                                       verbose_name='NF Referenciada')
+    ref_access_key = models.CharField('Chave NF Ref. Externa', max_length=44, blank=True)
+
+    # ── Auditoria ──────────────────────────────────────────────────────────
+    created_by = models.ForeignKey(
+        'core.User', null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='invoices_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Nota Fiscal'
+        verbose_name_plural = 'Notas Fiscais'
+        # Um pedido pode ter no máximo 1 NF-e E 1 NFC-e
+        unique_together     = [('order', 'model')]
+        ordering            = ['-issue_date']
+        indexes             = [
+            models.Index(fields=['status', 'model']),
+            models.Index(fields=['access_key']),
+        ]
+
+    def __str__(self):
+        return f'NF {self.get_model_display()} {self.serie}/{self.number} – {self.get_status_display()}'
+
+    @property
+    def is_editable(self):
+        """Pode editar só em rascunho ou após rejeição."""
+        return self.status in [InvoiceStatus.RASCUNHO, InvoiceStatus.REJEITADA]
+
+    @property
+    def is_cancelable(self):
+        """Pode cancelar somente se autorizada."""
+        return self.status == InvoiceStatus.AUTORIZADA
+
+    @property
+    def short_key(self):
+        if self.access_key:
+            return f'{self.access_key[:8]}...{self.access_key[-6:]}'
+        return '—'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE ITEM
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceItem(models.Model):
+    """
+    Snapshot de cada OrderItem no momento da emissão.
+    Os campos fiscais vêm diretamente do OrderItem,
+    já preenchidos pelo apply_fiscal_rules no momento de salvar o pedido.
+    """
+
+    invoice      = models.ForeignKey(Invoice, on_delete=models.CASCADE,
+                                     related_name='items')
+    # Referência ao item original — PROTECT para rastreabilidade
+    order_item   = models.ForeignKey(
+        'core.OrderItem', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='invoice_items'
+    )
+    item_number  = models.PositiveSmallIntegerField('Nº Item')
+
+    # ── Produto (snapshot de ProductVariant/Product) ───────────────────────
+    product_code = models.CharField('Código', max_length=60)  # ProductVariant.sku
+    ean          = models.CharField('EAN/GTIN', max_length=14, blank=True, default='SEM GTIN')  # ProductVariant.ean13
+    description  = models.CharField('Descrição', max_length=120)   # Product.name
+    ncm          = models.CharField('NCM', max_length=8)             # OrderItem.ncm (string)
+    cest         = models.CharField('CEST', max_length=7, blank=True)
+    cfop         = models.CharField('CFOP', max_length=4)            # OrderItem.cfop
+    unit         = models.CharField('Unidade', max_length=6, default='UN')
+    origin       = models.CharField('Origem', max_length=1, default='0')  # Product.origin
+
+    # ── Quantidades e valores ──────────────────────────────────────────────
+    quantity     = models.DecimalField('Quantidade', max_digits=15, decimal_places=4)
+    unit_price   = models.DecimalField('Preço Unitário', max_digits=15, decimal_places=10)
+    gross_total  = models.DecimalField('Total Bruto', max_digits=15, decimal_places=2)
+    discount     = models.DecimalField('Desconto', max_digits=15, decimal_places=2, default=0)
+    addition     = models.DecimalField('Acréscimo', max_digits=15, decimal_places=2, default=0)
+    freight      = models.DecimalField('Frete Item', max_digits=15, decimal_places=2, default=0)
+    insurance    = models.DecimalField('Seguro Item', max_digits=15, decimal_places=2, default=0)
+    other        = models.DecimalField('Outras Desp.', max_digits=15, decimal_places=2, default=0)
+
+    # ── ICMS (vem de OrderItem.icms_*) ────────────────────────────────────
+    # Regime Normal  → preenche icms_cst
+    # Simples Nacional → preenche icms_csosn
+    icms_cst     = models.CharField('CST ICMS', max_length=3, blank=True)    # OrderItem.icms_cst
+    icms_csosn   = models.CharField('CSOSN', max_length=3, blank=True)       # OrderItem.icms_csosn
+    icms_bc      = models.DecimalField('BC ICMS', max_digits=15, decimal_places=2, default=0)
+    icms_rate    = models.DecimalField('Alíq. ICMS %', max_digits=7, decimal_places=4, default=0)
+    icms_value   = models.DecimalField('Valor ICMS', max_digits=15, decimal_places=2, default=0)
+
+    # ICMS ST
+    icms_st_bc   = models.DecimalField('BC ST', max_digits=15, decimal_places=2, default=0)
+    icms_st_rate = models.DecimalField('Alíq. ST %', max_digits=7, decimal_places=4, default=0)
+    icms_st_value = models.DecimalField('Valor ST', max_digits=15, decimal_places=2, default=0)
+
+    # Crédito SN (CSOSN 101, 201, 900)
+    sn_credit_rate  = models.DecimalField('% Crédito SN', max_digits=7, decimal_places=4, default=0)
+    sn_credit_value = models.DecimalField('Valor Crédito SN', max_digits=15, decimal_places=2, default=0)
+
+    # ── PIS (vem de OrderItem.pis_*) ──────────────────────────────────────
+    pis_cst      = models.CharField('CST PIS', max_length=2, blank=True)
+    pis_bc       = models.DecimalField('BC PIS', max_digits=15, decimal_places=2, default=0)
+    pis_rate     = models.DecimalField('Alíq. PIS %', max_digits=7, decimal_places=4, default=0)
+    pis_value    = models.DecimalField('Valor PIS', max_digits=15, decimal_places=2, default=0)
+
+    # ── COFINS (vem de OrderItem.cofins_*) ────────────────────────────────
+    cofins_cst   = models.CharField('CST COFINS', max_length=2, blank=True)
+    cofins_bc    = models.DecimalField('BC COFINS', max_digits=15, decimal_places=2, default=0)
+    cofins_rate  = models.DecimalField('Alíq. COFINS %', max_digits=7, decimal_places=4, default=0)
+    cofins_value = models.DecimalField('Valor COFINS', max_digits=15, decimal_places=2, default=0)
+
+    item_info    = models.CharField('Info Adicional Item', max_length=500, blank=True)
+
+    class Meta:
+        verbose_name        = 'Item da NF'
+        verbose_name_plural = 'Itens da NF'
+        unique_together     = [('invoice', 'item_number')]
+        ordering            = ['item_number']
+
+    def __str__(self):
+        return f'Item {self.item_number} – {self.description}'
+
+    @property
+    def net_total(self):
+        return self.gross_total - self.discount + self.addition
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE PAYMENT
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoicePayment(models.Model):
+    """
+    Snapshot dos pagamentos no momento da emissão.
+    O código SEFAZ vem de PaymentMethod.payment_type (já mapeado com os
+    mesmos valores do XML: 01=Dinheiro, 03=Cartão Crédito, 17=PIX, etc.)
+    """
+
+    PAYMENT_CHOICES = [
+        ('01', 'Dinheiro'),        ('02', 'Cheque'),
+        ('03', 'Cartão Crédito'),  ('04', 'Cartão Débito'),
+        ('05', 'Crédito Loja'),    ('10', 'Vale Alimentação'),
+        ('11', 'Vale Refeição'),   ('12', 'Vale Presente'),
+        ('13', 'Vale Combustível'),('14', 'Duplicata'),
+        ('15', 'Boleto'),          ('16', 'Depósito'),
+        ('17', 'PIX'),             ('90', 'Sem Pagamento'),
+        ('99', 'Outros'),
+    ]
+
+    CARD_FLAG_CHOICES = [
+        ('01', 'Visa'), ('02', 'Mastercard'), ('03', 'Amex'),
+        ('04', 'Sorocred'), ('05', 'Diners'), ('06', 'Elo'),
+        ('07', 'Hipercard'), ('08', 'Aura'), ('09', 'Cabal'), ('99', 'Outros'),
+    ]
+
+    invoice       = models.ForeignKey(Invoice, on_delete=models.CASCADE,
+                                      related_name='payments')
+    # Referência ao pagamento original para rastreabilidade
+    order_payment = models.ForeignKey(
+        'core.OrderPayment', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='invoice_payments'
+    )
+
+    # Código de 2 dígitos do XML (convertido de PaymentMethod.payment_type)
+    payment_code  = models.CharField('Forma (SEFAZ)', max_length=2,
+                                     choices=PAYMENT_CHOICES)
+    value         = models.DecimalField('Valor', max_digits=15, decimal_places=2)
+    change        = models.DecimalField('Troco', max_digits=15, decimal_places=2, default=0)
+
+    # Dados de cartão (grupo <card> do XML — opcional)
+    card_integration = models.CharField('Tipo Integração', max_length=1,
+                                        choices=[('1', 'Integrado TEF'), ('2', 'Não Integrado')],
+                                        blank=True)
+    card_cnpj     = models.CharField('CNPJ Credenciadora', max_length=14, blank=True)
+    card_flag     = models.CharField('Bandeira', max_length=2,
+                                     choices=CARD_FLAG_CHOICES, blank=True)
+    card_auth     = models.CharField('NSU/Autorização', max_length=20, blank=True)
+
+    class Meta:
+        verbose_name        = 'Pagamento da NF'
+        verbose_name_plural = 'Pagamentos da NF'
+
+    def __str__(self):
+        return f'{self.get_payment_code_display()} – R$ {self.value}'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE TRANSPORT
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceTransport(models.Model):
+    """Grupo transp da NF. Um registro por Invoice."""
+
+    invoice         = models.OneToOneField(Invoice, on_delete=models.CASCADE,
+                                           related_name='transport')
+    # Espelha Orders.freight_mode
+    freight_mode    = models.CharField('Modalidade Frete', max_length=1,
+                                       choices=ModalidadeFrete.choices,
+                                       default=ModalidadeFrete.SEM_FRETE)
+
+    # Transportadora
+    carrier_name    = models.CharField('Nome', max_length=60, blank=True)
+    carrier_cnpj    = models.CharField('CNPJ', max_length=14, blank=True)
+    carrier_cpf     = models.CharField('CPF', max_length=11, blank=True)
+    carrier_ie      = models.CharField('IE', max_length=20, blank=True)
+    carrier_address = models.CharField('Endereço', max_length=60, blank=True)
+    carrier_city    = models.CharField('Cidade', max_length=60, blank=True)
+    carrier_state   = models.CharField('UF', max_length=2, blank=True)
+
+    # Veículo
+    vehicle_plate   = models.CharField('Placa', max_length=8, blank=True)
+    vehicle_state   = models.CharField('UF Placa', max_length=2, blank=True)
+    vehicle_rntc    = models.CharField('RNTC', max_length=20, blank=True)
+
+    # Volumes
+    volume_qty      = models.DecimalField('Qtde Volumes', max_digits=15, decimal_places=4,
+                                          null=True, blank=True)
+    volume_species  = models.CharField('Espécie', max_length=60, blank=True)
+    volume_brand    = models.CharField('Marca', max_length=60, blank=True)
+    volume_numbering = models.CharField('Numeração', max_length=60, blank=True)
+    net_weight      = models.DecimalField('Peso Líquido (kg)', max_digits=15, decimal_places=3,
+                                          null=True, blank=True)
+    gross_weight    = models.DecimalField('Peso Bruto (kg)', max_digits=15, decimal_places=3,
+                                          null=True, blank=True)
+    seals           = models.JSONField('Lacres', default=list, blank=True)
+
+    class Meta:
+        verbose_name        = 'Transporte da NF'
+        verbose_name_plural = 'Transportes das NFs'
+
+    def __str__(self):
+        return f'Transporte NF {self.invoice_id} – {self.get_freight_mode_display()}'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE EVENT
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceEvent(models.Model):
+    """Eventos da NF: cancelamento, carta de correção, inutilização."""
+
+    invoice        = models.ForeignKey(Invoice, on_delete=models.CASCADE,
+                                       related_name='events')
+    event_type     = models.CharField('Tipo', max_length=6, choices=TipoEvento.choices)
+    sequence       = models.PositiveSmallIntegerField('Sequência', default=1)
+    event_date     = models.DateTimeField('Data', default=timezone.now)
+    justification  = models.TextField('Justificativa / Texto')
+    event_protocol = models.CharField('Protocolo', max_length=60, blank=True)
+    return_code    = models.CharField('Código Retorno', max_length=10, blank=True)
+    return_message = models.TextField('Mensagem Retorno', blank=True)
+    xml_event      = models.TextField('XML Evento', blank=True)
+    xml_return     = models.TextField('XML Retorno', blank=True)
+    created_by     = models.ForeignKey('core.User', null=True, blank=True,
+                                       on_delete=models.SET_NULL)
+    created_at     = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Evento de NF'
+        verbose_name_plural = 'Eventos de NF'
+        ordering            = ['-event_date']
+
+    def __str__(self):
+        return f'{self.get_event_type_display()} – NF {self.invoice_id}'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE LOG — imutável, apenas inserção
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InvoiceLog(models.Model):
+
+    class Action(models.TextChoices):
+        GENERATE   = 'GENERATE',   'Geração'
+        SIGN       = 'SIGN',       'Assinatura XML'
+        TRANSMIT   = 'TRANSMIT',   'Transmissão SEFAZ'
+        QUERY      = 'QUERY',      'Consulta Status'
+        CANCEL     = 'CANCEL',     'Cancelamento'
+        VOID       = 'VOID',       'Inutilização'
+        CORRECTION = 'CORRECTION', 'Carta de Correção'
+        DANFE      = 'DANFE',      'Geração DANFE'
+
+    class Result(models.TextChoices):
+        SUCCESS = 'SUCCESS', 'Sucesso'
+        ERROR   = 'ERROR',   'Erro'
+        WARNING = 'WARNING', 'Aviso'
+
+    invoice     = models.ForeignKey(Invoice, on_delete=models.CASCADE,
+                                    related_name='logs')
+    action      = models.CharField('Ação', max_length=20, choices=Action.choices)
+    result      = models.CharField('Resultado', max_length=10, choices=Result.choices)
+    return_code = models.CharField('Código', max_length=10, blank=True)
+    message     = models.TextField('Mensagem')
+    detail      = models.TextField('Detalhe / Stacktrace', blank=True)
+    xml_sent    = models.TextField('XML Enviado (snapshot)', blank=True)
+    xml_return  = models.TextField('XML Retorno (snapshot)', blank=True)
+    duration_ms = models.PositiveIntegerField('Duração (ms)', null=True, blank=True)
+    created_by  = models.ForeignKey('core.User', null=True, blank=True,
+                                    on_delete=models.SET_NULL)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Log de NF'
+        verbose_name_plural = 'Logs de NF'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        ts = self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else '—'
+        return f'[{self.result}] {self.get_action_display()} – NF {self.invoice_id} – {ts}'

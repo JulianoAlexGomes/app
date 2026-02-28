@@ -1,36 +1,48 @@
-<div class="card p-3 mb-4">
-    <h5>Status do Pedido</h5>
+{% comment %}
+  templates/orders/status_block.html
+  Inclua com: {% include 'orders/status_block.html' %}
+{% endcomment %}
 
-    <div class="row align-items-center">
-        <div class="col-md-6">
-            <strong>Status atual:</strong>
-            {{ order.get_status_display }}
-        </div>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
 
-        <div class="col-md-6 text-end">
-            <div class="d-inline-flex gap-2">
+            {% comment %} <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing:.5px">Status</span>
+                <span class="badge fs-6 px-3 py-2
+                    {% if order.status == 'DIGITACAO' %}bg-secondary
+                    {% elif order.status == 'ORCAMENTO' %}bg-info text-dark
+                    {% elif order.status == 'EM_SEPARACAO' %}bg-warning text-dark
+                    {% elif order.status == 'SEPARADO' %}bg-primary
+                    {% elif order.status == 'FATURADO' %}bg-success
+                    {% elif order.status == 'CANCELADO' %}bg-danger
+                    {% else %}bg-secondary{% endif %}">
+                    {{ order.get_status_display }}
+                </span>
+            </div> {% endcomment %}
 
-                {% if order.next_status %}
-                <form method="post"
-                      action="{% url 'order_advance_status' order.id %}">
+            <div class="d-flex gap-2">
+                {% if order.status != 'CANCELADO' %}
+                <form method="post" action="{% url 'order_cancel' order.id %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">
-                        Avançar Etapa
+                    <button type="submit"
+                            class="btn btn-outline-danger btn-sm px-3"
+                            onclick="return confirm('Cancelar este pedido?')">
+                        Cancelar Pedido
                     </button>
                 </form>
                 {% endif %}
-
-                {% if order.status != 'CANCELADO' %}
-                <form method="post"
-                      action="{% url 'order_cancel' order.id %}">
+                {% if order.next_status %}
+                <form method="post" action="{% url 'order_advance_status' order.id %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">
-                        Cancelar Pedido
+                    <button type="submit" class="btn btn-primary btn-sm px-4">
+                        Avançar Etapa →
                     </button>
                 </form>
                 {% endif %}
 
             </div>
+
         </div>
     </div>
 </div>

@@ -14,14 +14,12 @@
     border-radius: 14px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.05);
 }
-
 .table thead th {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: .5px;
     background-color: #f8f9fa;
 }
-
 .btn-icon {
     width: 36px;
     height: 36px;
@@ -32,22 +30,11 @@
     border: 1px solid #dee2e6;
     background: #fff;
     transition: .2s;
+    cursor: pointer;
 }
-
 .btn-icon:hover { transform: scale(1.05); }
-
-.btn-edit:hover {
-    background: #0d6efd;
-    color: #fff;
-    border-color: #0d6efd;
-}
-
-.btn-pay:hover {
-    background: #198754;
-    color: #fff;
-    border-color: #198754;
-}
-
+.btn-edit:hover  { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+.btn-pay:hover   { background: #198754; color: #fff; border-color: #198754; }
 .badge-payment {
     font-size: 11px;
     padding: 5px 8px;
@@ -56,16 +43,17 @@
     color: #495057;
 }
 
+.btn-estornar:hover {
+    background: #dc3545;
+    color: #fff !important;
+    border-color: #dc3545;
+}
+
 .row-overdue {
     background-color: #fff5f5 !important;
     border-left: 4px solid #dc3545;
 }
-
-th.actions-col,
-td.actions-col {
-    width: 110px;
-    text-align: center;
-}
+th.actions-col, td.actions-col { width: 110px; text-align: center; }
 </style>
 
 <div class="container mt-4">
@@ -82,7 +70,6 @@ td.actions-col {
 <div class="card card-dashboard mb-4">
     <div class="card-body">
         <form method="get" class="row g-3">
-
             <div class="col-md-3">
                 <label class="form-label">Cliente</label>
                 <select name="client" class="form-select">
@@ -95,17 +82,14 @@ td.actions-col {
                     {% endfor %}
                 </select>
             </div>
-
             <div class="col-md-2">
                 <label class="form-label">Data Inicial</label>
                 <input type="date" name="start_date" value="{{ start_date }}" class="form-control">
             </div>
-
             <div class="col-md-2">
                 <label class="form-label">Data Final</label>
                 <input type="date" name="end_date" value="{{ end_date }}" class="form-control">
             </div>
-
             <div class="col-md-2">
                 <label class="form-label">Status</label>
                 <select name="status" class="form-select">
@@ -114,7 +98,6 @@ td.actions-col {
                     <option value="open" {% if status == 'open' %}selected{% endif %}>Aberto</option>
                 </select>
             </div>
-
             <div class="col-md-3 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary me-2">
                     <i class="bi bi-search"></i>
@@ -123,7 +106,6 @@ td.actions-col {
                     <i class="bi bi-arrow-clockwise"></i>
                 </a>
             </div>
-
         </form>
     </div>
 </div>
@@ -138,20 +120,16 @@ td.actions-col {
 <!-- ABAS -->
 <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#entradas">
-            Entradas
-        </button>
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#entradas">Entradas</button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#saidas">
-            Saídas
-        </button>
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#saidas">Saídas</button>
     </li>
 </ul>
 
 <div class="tab-content">
 
-<!-- ENTRADAS -->
+<!-- ── ENTRADAS ── -->
 <div class="tab-pane fade show active" id="entradas">
 <div class="card card-dashboard">
 <div class="table-responsive">
@@ -163,7 +141,7 @@ td.actions-col {
     <th>Vencimento</th>
     <th>Parcela</th>
     <th>Descrição</th>
-    {% comment %} <th>Forma Pgto</th> {% endcomment %}
+    <th>Forma Pgto</th>
     <th>Valor</th>
     <th>Status</th>
     <th class="actions-col">Ações</th>
@@ -173,13 +151,17 @@ td.actions-col {
 {% for parcel in entradas %}
 <tr class="{% if not parcel.payed and parcel.deadline < today %}row-overdue{% endif %}">
     <td>{{ parcel.movement.id }}</td>
-    <td>{{ parcel.movement.client.name }}</td>
+    <td>{{ parcel.movement.client.name|default:"—" }}</td>
     <td>{{ parcel.deadline|date:"d/m/Y" }}</td>
     <td>{{ parcel.parcel }}</td>
     <td>{{ parcel.movement.description }}</td>
-    {% comment %} <td><span class="badge-payment">
-        {{ parcel.movement.get_payment_method_display }}
-    </span></td> {% endcomment %}
+    <td>
+        {% if parcel.movement.payment_method %}
+            <span class="badge-payment">{{ parcel.movement.payment_method }}</span>
+        {% else %}
+            <span class="text-muted small">—</span>
+        {% endif %}
+    </td>
     <td class="fw-bold text-success">R$ {{ parcel.value|floatformat:2 }}</td>
     <td>
         {% if parcel.payed %}
@@ -190,19 +172,45 @@ td.actions-col {
     </td>
     <td class="actions-col">
         <div class="d-flex justify-content-center gap-2">
+
             <a href="{% url 'financial_update' parcel.movement.id %}"
-               class="btn-icon btn-edit">
+               class="btn-icon btn-edit" title="Editar">
                 <i class="bi bi-pencil"></i>
             </a>
+
             {% if not parcel.payed %}
-            <a href="{% url 'parcel_pay' parcel.pk %}"
-               class="btn-icon btn-pay">
+            {# ── Baixar ── #}
+            <button type="button"
+                    class="btn-icon btn-pay btn-pagar"
+                    data-pk="{{ parcel.pk }}"
+                    data-descricao="{{ parcel.movement.description }}"
+                    data-parcela="{{ parcel.parcel }}"
+                    data-valor="{{ parcel.value|floatformat:2 }}"
+                    data-vencimento="{{ parcel.deadline|date:'d/m/Y' }}"
+                    data-payment-method-id="{{ parcel.movement.payment_method.pk|default:'' }}"
+                    title="Registrar pagamento">
                 <i class="bi bi-cash-stack"></i>
-            </a>
+            </button>
+            {% else %}
+            {# ── Estornar ── #}
+            <button type="button"
+                    class="btn-icon btn-estornar"
+                    data-pk="{{ parcel.pk }}"
+                    data-descricao="{{ parcel.movement.description }}"
+                    data-parcela="{{ parcel.parcel }}"
+                    data-valor="{{ parcel.value|floatformat:2 }}"
+                    data-paydate="{{ parcel.paydate|date:'d/m/Y' }}"
+                    title="Estornar pagamento"
+                    style="border-color:#dc3545; color:#dc3545;">
+                <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
             {% endif %}
+
         </div>
     </td>
 </tr>
+{% empty %}
+<tr><td colspan="9" class="text-center text-muted py-4">Nenhuma entrada encontrada.</td></tr>
 {% endfor %}
 </tbody>
 </table>
@@ -210,7 +218,7 @@ td.actions-col {
 </div>
 </div>
 
-<!-- SAÍDAS COMPLETAS -->
+<!-- ── SAÍDAS ── -->
 <div class="tab-pane fade" id="saidas">
 <div class="card card-dashboard">
 <div class="table-responsive">
@@ -221,7 +229,8 @@ td.actions-col {
     <th>Descrição</th>
     <th>Fornecedor</th>
     <th>Vencimento</th>
-    {% comment %} <th>Forma Pgto</th> {% endcomment %}
+    <th>Parcela</th>
+    <th>Forma Pgto</th>
     <th>Valor</th>
     <th>Status</th>
     <th class="actions-col">Ações</th>
@@ -234,13 +243,15 @@ td.actions-col {
     <td>{{ parcel.movement.description }}</td>
     <td>{{ parcel.movement.client.name|default:"—" }}</td>
     <td>{{ parcel.deadline|date:"d/m/Y" }}</td>
-    {% comment %} <td><span class="badge-payment">
-        {{ parcel.movement.get_payment_method_display }}
-    </span>
-    </td> {% endcomment %}
-    <td class="fw-bold text-danger">
-        R$ {{ parcel.value|floatformat:2 }}
+    <td>{{ parcel.parcel }}</td>
+    <td>
+        {% if parcel.movement.payment_method %}
+            <span class="badge-payment">{{ parcel.movement.payment_method }}</span>
+        {% else %}
+            <span class="text-muted small">—</span>
+        {% endif %}
     </td>
+    <td class="fw-bold text-danger">R$ {{ parcel.value|floatformat:2 }}</td>
     <td>
         {% if parcel.payed %}
             <span class="badge bg-success">Pago</span>
@@ -252,20 +263,43 @@ td.actions-col {
         <div class="d-flex justify-content-center gap-2">
 
             <a href="{% url 'financial_update' parcel.movement.id %}"
-               class="btn-icon btn-edit">
+               class="btn-icon btn-edit" title="Editar">
                 <i class="bi bi-pencil"></i>
             </a>
 
             {% if not parcel.payed %}
-            <a href="{% url 'parcel_pay' parcel.pk %}"
-               class="btn-icon btn-pay">
+            {# ── Baixar ── #}
+            <button type="button"
+                    class="btn-icon btn-pay btn-pagar"
+                    data-pk="{{ parcel.pk }}"
+                    data-descricao="{{ parcel.movement.description }}"
+                    data-parcela="{{ parcel.parcel }}"
+                    data-valor="{{ parcel.value|floatformat:2 }}"
+                    data-vencimento="{{ parcel.deadline|date:'d/m/Y' }}"
+                    data-payment-method-id="{{ parcel.movement.payment_method.pk|default:'' }}"
+                    title="Registrar pagamento">
                 <i class="bi bi-cash-stack"></i>
-            </a>
+            </button>
+            {% else %}
+            {# ── Estornar ── #}
+            <button type="button"
+                    class="btn-icon btn-estornar"
+                    data-pk="{{ parcel.pk }}"
+                    data-descricao="{{ parcel.movement.description }}"
+                    data-parcela="{{ parcel.parcel }}"
+                    data-valor="{{ parcel.value|floatformat:2 }}"
+                    data-paydate="{{ parcel.paydate|date:'d/m/Y' }}"
+                    title="Estornar pagamento"
+                    style="border-color:#dc3545; color:#dc3545;">
+                <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
             {% endif %}
 
         </div>
     </td>
 </tr>
+{% empty %}
+<tr><td colspan="9" class="text-center text-muted py-4">Nenhuma saída encontrada.</td></tr>
 {% endfor %}
 </tbody>
 </table>
@@ -273,8 +307,159 @@ td.actions-col {
 </div>
 </div>
 
+</div>{# /tab-content #}
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL — CONFIRMAR PAGAMENTO
+════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalPagamento" tabindex="-1" aria-labelledby="modalPagamentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="modalPagamentoLabel">💰 Confirmar Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body pt-3">
+
+                <!-- Resumo da parcela -->
+                <div class="rounded-3 p-3 mb-4" style="background:#f8f9fa;">
+                    <div class="row g-2 small">
+                        <div class="col-8">
+                            <span class="text-muted">Descrição</span><br>
+                            <strong id="pay-descricao">—</strong>
+                        </div>
+                        <div class="col-4">
+                            <span class="text-muted">Parcela</span><br>
+                            <strong id="pay-parcela">—</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Valor</span><br>
+                            <strong class="text-success fs-5" id="pay-valor">—</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Vencimento</span><br>
+                            <strong id="pay-vencimento">—</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulário -->
+                <form id="form-pagamento">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Data do pagamento</label>
+                        <input type="date" name="paydate" id="pay-paydate" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Forma de pagamento <span class="text-muted fw-normal">(opcional)</span>
+                        </label>
+                        <select name="payment_method" id="pay-payment-method" class="form-select">
+                            <option value="">— Manter atual —</option>
+                            {% for pm in payment_methods %}
+                            <option value="{{ pm.pk }}">{{ pm }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold">
+                            Banco <span class="text-muted fw-normal">(opcional)</span>
+                        </label>
+                        <select name="bank" id="pay-bank" class="form-select">
+                            <option value="">— Selecione o banco —</option>
+                            {% for bank in banks %}
+                            <option value="{{ bank.pk }}">
+                                {{ bank.name }} — {{ bank.bank_name }} ({{ bank.account_number }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                </form>
+
+                <!-- Feedback de erro -->
+                <div id="pay-erro" class="alert alert-danger mt-3 d-none small"></div>
+
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success fw-semibold px-4" id="btn-confirmar-pagar">
+                    <span id="btn-pay-texto">✅ Confirmar Pagamento</span>
+                    <span id="btn-pay-loading" class="d-none">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Salvando...
+                    </span>
+                </button>
+            </div>
+
+        </div>
+    </div>
 </div>
+
+<div class="modal fade" id="modalEstorno" tabindex="-1" aria-labelledby="modalEstornoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="modalEstornoLabel">
+                    ↩️ Estornar Pagamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body pt-3">
+
+                <div class="rounded-3 p-3 mb-3" style="background:#fff5f5; border:1px solid #f5c2c7;">
+                    <div class="row g-2 small">
+                        <div class="col-8">
+                            <span class="text-muted">Descrição</span><br>
+                            <strong id="estorno-descricao">—</strong>
+                        </div>
+                        <div class="col-4">
+                            <span class="text-muted">Parcela</span><br>
+                            <strong id="estorno-parcela">—</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Valor</span><br>
+                            <strong class="text-danger fs-5" id="estorno-valor">—</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Pago em</span><br>
+                            <strong id="estorno-paydate">—</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-muted small mb-0">
+                    ⚠️ O pagamento será revertido e a parcela voltará ao status <strong>Aberto</strong>.
+                    O saldo do banco será ajustado automaticamente.
+                </p>
+
+                <div id="estorno-erro" class="alert alert-danger mt-3 d-none small"></div>
+
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger fw-semibold px-4" id="btn-confirmar-estorno">
+                    <span id="btn-estorno-texto">↩️ Confirmar Estorno</span>
+                    <span id="btn-estorno-loading" class="d-none">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Processando...
+                    </span>
+                </button>
+            </div>
+
+        </div>
+    </div>
 </div>
+
+</div>{# /container #}
 
 <script>
 new Chart(document.getElementById('financeChart'), {
@@ -299,6 +484,160 @@ new Chart(document.getElementById('financeChart'), {
         }
     }
 });
+
+/* ── Modal de pagamento ─────────────────────────────────────── */
+(function () {
+    let parcelPk = null;
+
+    // Monta a URL base a partir da URL com pk=0, substituindo apenas o segmento numérico
+    const PAY_URL_TEMPLATE = "{% url 'parcel_pay' 0 %}";  // ex: /financeiro/parcela/0/pagar/
+    function payUrl(pk) {
+        return PAY_URL_TEMPLATE.replace('/0/', '/' + pk + '/');
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.btn-pagar');
+        if (!btn) return;
+
+        parcelPk = btn.dataset.pk;
+
+        document.getElementById('pay-descricao').textContent  = btn.dataset.descricao  || '—';
+        document.getElementById('pay-parcela').textContent    = btn.dataset.parcela     || '—';
+        document.getElementById('pay-valor').textContent      = 'R$ ' + (btn.dataset.valor || '0,00');
+        document.getElementById('pay-vencimento').textContent = btn.dataset.vencimento  || '—';
+
+        // Pré-seleciona a forma de pagamento atual
+        const pmId = btn.dataset.paymentMethodId || '';
+        const pmSelect = document.getElementById('pay-payment-method');
+        pmSelect.value = pmId;  // se não existir na lista, fica em "Manter atual"
+
+        document.getElementById('pay-paydate').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('pay-bank').value    = '';
+        document.getElementById('pay-erro').classList.add('d-none');
+
+        new bootstrap.Modal(document.getElementById('modalPagamento')).show();
+    });
+
+    document.getElementById('btn-confirmar-pagar').addEventListener('click', function () {
+        if (!parcelPk) return;
+
+        const btn           = this;
+        const texto         = document.getElementById('btn-pay-texto');
+        const loading       = document.getElementById('btn-pay-loading');
+        const erroDiv       = document.getElementById('pay-erro');
+        const paydate       = document.getElementById('pay-paydate').value;
+        const bank          = document.getElementById('pay-bank').value;
+        const paymentMethod = document.getElementById('pay-payment-method').value;
+        const csrf          = document.querySelector('#form-pagamento [name=csrfmiddlewaretoken]').value;
+
+        if (!paydate) {
+            erroDiv.textContent = 'Informe a data do pagamento.';
+            erroDiv.classList.remove('d-none');
+            return;
+        }
+
+        btn.disabled = true;
+        texto.classList.add('d-none');
+        loading.classList.remove('d-none');
+        erroDiv.classList.add('d-none');
+
+        const body = new URLSearchParams({ paydate, csrfmiddlewaretoken: csrf });
+        if (bank)          body.append('bank', bank);
+        if (paymentMethod) body.append('payment_method', paymentMethod);
+
+        fetch(payUrl(parcelPk), {
+            method: 'POST',
+            body:   body,
+        })
+        .then(r => r.json())
+        .then(function (data) {
+            if (data.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+                window.location.reload();
+            } else {
+                erroDiv.textContent = data.error || 'Erro ao registrar pagamento.';
+                erroDiv.classList.remove('d-none');
+                btn.disabled = false;
+                texto.classList.remove('d-none');
+                loading.classList.add('d-none');
+            }
+        })
+        .catch(function () {
+            erroDiv.textContent = 'Erro de conexão. Tente novamente.';
+            erroDiv.classList.remove('d-none');
+            btn.disabled = false;
+            texto.classList.remove('d-none');
+            loading.classList.add('d-none');
+        });
+    });
+})();
+
+(function () {
+    let estornoPk = null;
+    const UNPAY_URL_TEMPLATE = "{% url 'parcel_unpay' 0 %}";
+    function unpayUrl(pk) {
+        return UNPAY_URL_TEMPLATE.replace('/0/', '/' + pk + '/');
+    }
+
+    // Abre o modal de estorno
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.btn-estornar');
+        if (!btn) return;
+
+        estornoPk = btn.dataset.pk;
+
+        document.getElementById('estorno-descricao').textContent = btn.dataset.descricao || '—';
+        document.getElementById('estorno-parcela').textContent   = btn.dataset.parcela   || '—';
+        document.getElementById('estorno-valor').textContent     = 'R$ ' + (btn.dataset.valor || '0,00');
+        document.getElementById('estorno-paydate').textContent   = btn.dataset.paydate   || '—';
+        document.getElementById('estorno-erro').classList.add('d-none');
+
+        new bootstrap.Modal(document.getElementById('modalEstorno')).show();
+    });
+
+    // Confirma o estorno
+    document.getElementById('btn-confirmar-estorno').addEventListener('click', function () {
+        if (!estornoPk) return;
+
+        const btn     = this;
+        const texto   = document.getElementById('btn-estorno-texto');
+        const loading = document.getElementById('btn-estorno-loading');
+        const erroDiv = document.getElementById('estorno-erro');
+        const csrf    = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        btn.disabled = true;
+        texto.classList.add('d-none');
+        loading.classList.remove('d-none');
+        erroDiv.classList.add('d-none');
+
+        fetch(unpayUrl(estornoPk), {
+            method:  'POST',
+            headers: { 'X-CSRFToken': csrf },
+            body:    new URLSearchParams({ csrfmiddlewaretoken: csrf }),
+        })
+        .then(r => r.json())
+        .then(function (data) {
+            if (data.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('modalEstorno')).hide();
+                window.location.reload();
+            } else {
+                erroDiv.textContent = data.error || 'Erro ao estornar.';
+                erroDiv.classList.remove('d-none');
+                btn.disabled = false;
+                texto.classList.remove('d-none');
+                loading.classList.add('d-none');
+            }
+        })
+        .catch(function () {
+            erroDiv.textContent = 'Erro de conexão. Tente novamente.';
+            erroDiv.classList.remove('d-none');
+            btn.disabled = false;
+            texto.classList.remove('d-none');
+            loading.classList.add('d-none');
+        });
+    });
+})();
+
 </script>
 
 {% endblock %}

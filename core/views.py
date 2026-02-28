@@ -7,7 +7,7 @@ from .forms import (
     ClientForm, SizechartForm, SizesFormSet, colorchartForm, modelchartForm,
     ProductForm, StockEntryForm, OrderForm, OrderItemFormSet, ProductImageFormSet,
     PaymentMethodForm, BankAccountForm, FinancialMovementForm, FinancialParcelFormSet,
-    ParcelPayForm, OrderPaymentFormSet
+    ParcelPayForm, OrderPaymentFormSet, FiscalOperationForm, InvoiceForm, InvoiceItemFormSet, InvoicePaymentFormSet
 )
 from django.shortcuts import redirect, get_object_or_404
 from django.core.paginator import Paginator
@@ -16,7 +16,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from .services.order_stock import reserve_stock, release_stock, finalize_stock, create_variants
-from .services.fiscal import apply_fiscal_rules  # 🔥 FISCAL
+from .services.fiscal_rules import apply_fiscal_rules  # 🔥 FISCAL
 from django.core.exceptions import ValidationError
 from django.utils.timezone import make_aware
 from datetime import datetime, date
@@ -26,7 +26,8 @@ from django.urls import reverse_lazy, reverse
 from decimal import Decimal
 from .models import Client, Orders, Product, FinancialMovement, FinancialMovementParcel
 import calendar
-
+from core.services.nf_generator import gerar_nota_fiscal
+from core.models import Invoice, InvoiceStatus
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HOME / DASHBOARD
@@ -670,6 +671,15 @@ def order_update(request, pk):
     total_payments = order.payments.aggregate(total=Sum('total_value'))['total'] or Decimal('0.00')
     saldo          = total_order - total_payments
 
+    invoice_ativa = Invoice.objects.filter(
+       order=order,
+       status__in=[
+           InvoiceStatus.RASCUNHO,
+           InvoiceStatus.PENDENTE,
+           InvoiceStatus.AUTORIZADA,
+       ]
+   ).first()
+
     return render(request, 'orders/form_update.html', {
         'form': form,
         'formset': formset,
@@ -679,6 +689,7 @@ def order_update(request, pk):
         'total_payments': total_payments,
         'saldo': saldo,
         'payments_with_parcels': order.payments.prefetch_related('parcels_records'),
+        'invoice_ativa': invoice_ativa,
     })
 
 
@@ -779,6 +790,29 @@ def order_cancel(request, order_id):
     messages.success(request, 'Pedido cancelado com sucesso.')
     return redirect('order_update', order.id)
 
+@login_required
+@transaction.atomic
+def gerar_nfe(request, order_id):
+    order = get_object_or_404(Orders, pk=order_id, business=request.user.business)
+
+    if request.method != 'POST':
+        return redirect('order_update', pk=order_id)
+
+    try:
+        invoice = gerar_nota_fiscal(order=order, usuario=request.user)
+        messages.success(
+            request,
+            f'✅ {invoice.get_model_display()} {invoice.serie}/{invoice.number} gerada com sucesso!'
+        )
+        return redirect('invoice_detail', pk=invoice.pk)
+
+    except ValueError as e:
+        messages.error(request, str(e))
+
+    except Exception as e:
+        messages.error(request, f'Erro ao gerar NF: {str(e)}')
+
+    return redirect('order_update', pk=order_id)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AJAX — VARIANTES
@@ -936,21 +970,28 @@ def financial_list(request):
     business = request.user.business
     today    = date.today()
 
-    start_date_str = request.GET.get('start_date')
-    end_date_str   = request.GET.get('end_date')
-    status         = request.GET.get('status')
-    client_id      = request.GET.get('client')
+    start_date_str = request.GET.get('start_date', '').strip()
+    end_date_str   = request.GET.get('end_date', '').strip()
+    status         = request.GET.get('status', '')
+    client_id      = request.GET.get('client', '')
 
+    # Padrão: mês atual — só aplica se NENHUMA data foi enviada
     if not start_date_str and not end_date_str:
         start_date = today.replace(day=1)
         end_date   = today.replace(day=calendar.monthrange(today.year, today.month)[1])
     else:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
-        end_date   = datetime.strptime(end_date_str,   '%Y-%m-%d').date() if end_date_str   else None
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
+        except ValueError:
+            start_date = None
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+        except ValueError:
+            end_date = None
 
     parcels = FinancialMovementParcel.objects.filter(
         movement__business=business
-    ).select_related('movement', 'movement__client')
+    ).select_related('movement', 'movement__client').order_by('deadline')
 
     if start_date:
         parcels = parcels.filter(deadline__gte=start_date)
@@ -983,8 +1024,31 @@ def financial_list(request):
         'start_date':     start_date.strftime('%Y-%m-%d') if start_date else '',
         'end_date':       end_date.strftime('%Y-%m-%d')   if end_date   else '',
         'status':         status,
+        'banks':          BankAccount.objects.filter(business=business),  # ← adicione esta linha
+        'payment_methods': PaymentMethod.objects.filter(business=business),
+        'today':          today,  # necessário para row-overdue no template
     })
 
+@login_required
+def parcel_unpay(request, pk):
+    from django.http import JsonResponse
+
+    parcel = get_object_or_404(
+        FinancialMovementParcel, pk=pk,
+        movement__business=request.user.business
+    )
+
+    if not parcel.payed:
+        return JsonResponse({'ok': False, 'error': 'Parcela não está paga.'})
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método não permitido.'})
+
+    parcel.payed   = False
+    parcel.paydate = None
+    parcel.save(update_fields=['payed', 'paydate'])
+
+    return JsonResponse({'ok': True})
 
 @login_required
 def financial_create(request):
@@ -1053,22 +1117,34 @@ def financial_delete(request, pk):
 
     return render(request, 'financial/delete.html', {'movement': movement})
 
-
 @login_required
 def parcel_pay(request, pk):
-    parcel = get_object_or_404(FinancialMovementParcel, pk=pk, movement__business=request.user.business)
+    from django.http import JsonResponse
+
+    parcel = get_object_or_404(
+        FinancialMovementParcel, pk=pk,
+        movement__business=request.user.business
+    )
 
     if parcel.payed:
-        return redirect('financial_list')
+        return JsonResponse({'ok': False, 'error': 'Parcela já registrada como paga.'})
 
-    form = ParcelPayForm(request.POST or None, instance=parcel, initial={'paydate': timezone.now().date()})
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método não permitido.'})
 
-    if request.method == 'POST' and form.is_valid():
+    form = ParcelPayForm(request.POST, instance=parcel)
+    form.fields['bank'].queryset = BankAccount.objects.filter(
+        business=request.user.business
+    )
+    form.fields['payment_method'].queryset = PaymentMethod.objects.filter(
+        business=request.user.business
+    )
+
+    if form.is_valid():
         form.save()
-        return redirect('financial_list')
+        return JsonResponse({'ok': True})
 
-    return render(request, 'financial/parcel_pay.html', {'parcel': parcel, 'form': form})
-
+    return JsonResponse({'ok': False, 'error': str(form.errors)})
 
 @login_required
 def financial_history(request):
@@ -1458,3 +1534,396 @@ class FiscalOperationDeleteView(LoginRequiredMixin, DeleteView):
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Operação excluída com sucesso.')
         return super().delete(request, *args, **kwargs)
+    
+
+@login_required
+def invoice_detail(request, pk):
+    """
+    Tela de detalhe da NF-e / NFC-e.
+    Exibe cabeçalho, itens, totais, pagamentos, transporte e log.
+    """
+    invoice = get_object_or_404(
+        Invoice,
+        pk=pk,
+        order__business=request.user.business
+    )
+    return render(request, 'fiscal/invoice_detail.html', {
+        'invoice': invoice,
+    })
+
+# @login_required
+# @transaction.atomic
+# def invoice_update(request, pk):
+#     invoice = get_object_or_404(Invoice, pk=pk)
+
+#     # BLOQUEIO FISCAL
+#     if invoice.status not in ['RASCUNHO', 'REJEITADA']:
+#         messages.error(request, "Esta NF não pode ser editada.")
+#         return redirect('invoice_detail', pk=pk)
+
+#     if request.method == 'POST':
+#         form = InvoiceForm(request.POST, instance=invoice)
+#         formset = InvoiceItemFormSet(request.POST, instance=invoice)
+
+#         if form.is_valid() and formset.is_valid():
+#             form.save()
+#             formset.save()
+#             messages.success(request, "Nota atualizada com sucesso.")
+#             return redirect('invoice_detail', pk=pk)
+#     else:
+#         form = InvoiceForm(instance=invoice)
+#         formset = InvoiceItemFormSet(instance=invoice)
+
+#     return render(request, 'fiscal/invoice_edit_full.html', {
+#         'form': form,
+#         'formset': formset,
+#         'invoice': invoice
+#     })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INVOICE VIEWS — cole no final de core/views.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def invoice_detail(request, pk):
+    invoice = get_object_or_404(
+        Invoice,
+        pk=pk,
+        order__business=request.user.business,
+    )
+    return render(request, 'fiscal/invoice_detail.html', {'invoice': invoice})
+
+
+@login_required
+@transaction.atomic
+def invoice_update(request, pk):
+    invoice = get_object_or_404(
+        Invoice,
+        pk=pk,
+        order__business=request.user.business,
+    )
+
+    if not invoice.is_editable:
+        messages.error(request, 'Esta NF não pode ser editada no status atual.')
+        return redirect('invoice_detail', pk=pk)
+
+    from .forms import InvoiceForm, InvoiceItemFormSet, InvoicePaymentFormSet
+
+    if request.method == 'POST':
+        form            = InvoiceForm(request.POST, instance=invoice)
+        item_formset    = InvoiceItemFormSet(request.POST, instance=invoice, prefix='items')
+        payment_formset = InvoicePaymentFormSet(request.POST, instance=invoice, prefix='payments')
+
+        form_ok     = form.is_valid()
+        items_ok    = item_formset.is_valid()
+        payments_ok = payment_formset.is_valid()
+
+        if form_ok and items_ok and payments_ok:
+            form.save()
+            item_formset.save()
+            payment_formset.save()
+
+            # Transporte
+            try:
+                t = invoice.transport
+                t.freight_mode   = request.POST.get('freight_mode', t.freight_mode)
+                t.carrier_name   = request.POST.get('carrier_name', '') or ''
+                t.carrier_cnpj   = request.POST.get('carrier_cnpj', '') or ''
+                t.vehicle_plate  = request.POST.get('vehicle_plate', '') or ''
+                t.vehicle_state  = request.POST.get('vehicle_state', '') or ''
+                vol   = request.POST.get('volume_qty', '').strip()
+                gross = request.POST.get('gross_weight', '').strip()
+                net   = request.POST.get('net_weight', '').strip()
+                t.volume_qty     = vol   if vol   else None
+                t.volume_species = request.POST.get('volume_species', '') or ''
+                t.gross_weight   = gross if gross else None
+                t.net_weight     = net   if net   else None
+                t.save()
+            except Exception:
+                pass
+
+            _recalcular_totais_invoice(invoice)
+
+            messages.success(request, '✅ NF atualizada com sucesso!')
+            return redirect('invoice_detail', pk=invoice.pk)
+
+        else:
+            if not form_ok:
+                for field, errs in form.errors.items():
+                    messages.error(request, f'Campo "{field}": {errs.as_text()}')
+            if not items_ok:
+                for i, f in enumerate(item_formset):
+                    for field, errs in f.errors.items():
+                        messages.error(request, f'Item {i+1} – "{field}": {errs.as_text()}')
+                if item_formset.non_form_errors():
+                    messages.error(request, str(item_formset.non_form_errors()))
+            if not payments_ok:
+                for i, f in enumerate(payment_formset):
+                    for field, errs in f.errors.items():
+                        messages.error(request, f'Pagamento {i+1} – "{field}": {errs.as_text()}')
+
+    else:
+        form            = InvoiceForm(instance=invoice)
+        item_formset    = InvoiceItemFormSet(instance=invoice, prefix='items')
+        payment_formset = InvoicePaymentFormSet(instance=invoice, prefix='payments')
+
+    return render(request, 'fiscal/invoice_edit.html', {
+        'form':            form,
+        'item_formset':    item_formset,
+        'payment_formset': payment_formset,
+        'invoice':         invoice,
+    })
+
+
+def _recalcular_totais_invoice(invoice):
+    from decimal import Decimal
+    invoice.refresh_from_db()
+    items = list(invoice.items.all())
+
+    total_products = sum(i.gross_total    for i in items) or Decimal('0')
+    total_discount = sum(i.discount       for i in items) or Decimal('0')
+    total_bc_icms  = sum(i.icms_bc        for i in items) or Decimal('0')
+    total_icms     = sum(i.icms_value     for i in items) or Decimal('0')
+    total_pis      = sum(i.pis_value      for i in items) or Decimal('0')
+    total_cofins   = sum(i.cofins_value   for i in items) or Decimal('0')
+    total_bc_st    = sum(i.icms_st_bc     for i in items) or Decimal('0')
+    total_icms_st  = sum(i.icms_st_value  for i in items) or Decimal('0')
+
+    frete  = invoice.total_freight   or Decimal('0')
+    seguro = invoice.total_insurance or Decimal('0')
+    outras = invoice.total_other     or Decimal('0')
+
+    invoice.total_products = total_products
+    invoice.total_discount = total_discount
+    invoice.total_bc_icms  = total_bc_icms
+    invoice.total_icms     = total_icms
+    invoice.total_pis      = total_pis
+    invoice.total_cofins   = total_cofins
+    invoice.total_bc_st    = total_bc_st
+    invoice.total_icms_st  = total_icms_st
+    invoice.total_nf       = total_products - total_discount + frete + seguro + outras
+
+    invoice.save(update_fields=[
+        'total_products', 'total_discount',
+        'total_bc_icms',  'total_icms',
+        'total_pis',      'total_cofins',
+        'total_bc_st',    'total_icms_st',
+        'total_nf',
+    ])
+
+
+# @login_required
+# @transaction.atomic
+# def invoice_transmit(request, pk):
+#     invoice = get_object_or_404(
+#         Invoice,
+#         pk=pk,
+#         order__business=request.user.business,
+#     )
+
+#     if request.method != 'POST':
+#         return redirect('invoice_detail', pk=pk)
+
+#     if invoice.status not in ['RASCUNHO', 'REJEITADA']:
+#         messages.error(request, 'Esta NF não pode ser transmitida no status atual.')
+#         return redirect('invoice_detail', pk=pk)
+
+#     try:
+#         from core.services.fiscal.xml_builder import build_xml
+#         from core.services.fiscal.signer import assinar_xml
+#         from core.services.fiscal.sefaz_client import transmitir
+
+#         xml_str      = build_xml(invoice)
+#         xml_assinado = assinar_xml(invoice, xml_str)
+#         resultado    = transmitir(invoice, xml_assinado)
+
+#         if resultado['sucesso']:
+#             messages.success(
+#                 request,
+#                 f'✅ NF Autorizada! Protocolo: {resultado["protocolo"]}'
+#             )
+#         else:
+#             messages.error(
+#                 request,
+#                 f'❌ Rejeição SEFAZ ({resultado["codigo"]}): {resultado["mensagem"]}'
+#             )
+
+#     except Exception as e:
+#         messages.error(request, f'Erro ao transmitir: {str(e)}')
+
+#     return redirect('invoice_detail', pk=pk)
+
+
+@login_required
+@transaction.atomic
+def invoice_transmit(request, pk):
+    invoice = get_object_or_404(
+        Invoice,
+        pk=pk,
+        order__business=request.user.business,
+    )
+
+    if request.method != 'POST':
+        return redirect('invoice_detail', pk=pk)
+
+    # ── Modo debug: ?debug=1 exibe o XML sem transmitir ──────────────────
+    debug = request.GET.get('debug') == '1'
+
+    if invoice.status not in ['RASCUNHO', 'REJEITADA']:
+        messages.error(request, 'Esta NF não pode ser transmitida no status atual.')
+        return redirect('invoice_detail', pk=pk)
+
+    try:
+        from core.services.fiscal.xml_builder import build_xml
+        from core.services.fiscal.signer import assinar_xml
+        from core.services.fiscal.sefaz_client import transmitir
+        from django.http import HttpResponse
+
+        xml_str = build_xml(invoice)
+
+        if debug:
+            # Retorna o XML formatado no browser — não transmite nem assina
+            from lxml import etree
+            try:
+                root        = etree.fromstring(xml_str.encode())
+                xml_bonito  = etree.tostring(root, pretty_print=True, encoding='unicode')
+            except Exception:
+                xml_bonito = xml_str
+            return HttpResponse(xml_bonito, content_type='text/xml; charset=utf-8')
+
+        xml_assinado = assinar_xml(invoice, xml_str)
+        resultado    = transmitir(invoice, xml_assinado)
+
+        if resultado['sucesso']:
+            messages.success(
+                request,
+                f'✅ NF Autorizada! Protocolo: {resultado["protocolo"]}'
+            )
+        else:
+            messages.error(
+                request,
+                f'❌ Rejeição SEFAZ ({resultado["codigo"]}): {resultado["mensagem"]}'
+            )
+
+    except Exception as e:
+        import traceback
+        messages.error(request, f'Erro ao transmitir: {str(e)}')
+        # Detalhe completo no terminal do servidor
+        traceback.print_exc()
+
+    return redirect('invoice_detail', pk=pk)
+
+@login_required
+@transaction.atomic
+def invoice_cancel(request, pk):
+    invoice = get_object_or_404(
+        Invoice,
+        pk=pk,
+        order__business=request.user.business,
+    )
+
+    if request.method != 'POST':
+        return redirect('invoice_detail', pk=pk)
+
+    justificativa = request.POST.get('justificativa', '').strip()
+
+    if len(justificativa) < 15:
+        messages.error(request, 'A justificativa deve ter no mínimo 15 caracteres.')
+        return redirect('invoice_detail', pk=pk)
+
+    try:
+        from core.services.fiscal.sefaz_client import cancelar
+        resultado = cancelar(invoice, justificativa)
+
+        if resultado['sucesso']:
+            messages.success(request, f'✅ NF Cancelada! Protocolo: {resultado["protocolo"]}')
+        else:
+            messages.error(
+                request,
+                f'❌ Erro ao cancelar ({resultado["codigo"]}): {resultado["mensagem"]}'
+            )
+
+    except Exception as e:
+        messages.error(request, f'Erro ao cancelar: {str(e)}')
+
+    return redirect('invoice_detail', pk=pk)
+
+# ── Substitua invoice_xml_debug em core/views.py ─────────────────────────────
+
+@login_required
+def invoice_xml_debug(request, pk):
+    import json
+    from lxml import etree
+
+    invoice = get_object_or_404(
+        Invoice, pk=pk, order__business=request.user.business
+    )
+
+    xml_content = ''
+    xml_raw     = ''
+    erro        = ''
+
+    try:
+        from core.services.fiscal.xml_builder import build_xml
+        xml_str = build_xml(invoice)
+
+        # Formata com indentação
+        try:
+            root        = etree.fromstring(xml_str.encode())
+            xml_bonito  = etree.tostring(root, pretty_print=True, encoding='unicode')
+        except Exception:
+            xml_bonito = xml_str
+
+        xml_content = xml_bonito
+        xml_raw     = xml_bonito
+
+    except Exception as e:
+        import traceback
+        erro = f'{str(e)}\n\n{traceback.format_exc()}'
+
+    return render(request, 'fiscal/invoice_xml_debug.html', {
+        'invoice':     invoice,
+        'xml_content': xml_content,
+        'xml_raw':     json.dumps(xml_raw),   # seguro para uso no JS
+        'erro':        erro,
+    })
+
+@login_required
+def invoice_list(request):
+    from django.db.models import Q
+
+    invoices = Invoice.objects.filter(
+        order__business=request.user.business
+    ).select_related('order').order_by('-issue_date', '-number')
+
+    # Filtros
+    status = request.GET.get('status', '')
+    modelo = request.GET.get('modelo', '')
+    busca  = request.GET.get('q', '')
+
+    if status:
+        invoices = invoices.filter(status=status)
+    if modelo:
+        invoices = invoices.filter(model=modelo)
+    if busca:
+        invoices = invoices.filter(
+            Q(number__icontains=busca) |
+            Q(dest_name__icontains=busca) |
+            Q(access_key__icontains=busca) |
+            Q(nature_operation__icontains=busca)
+        )
+
+    return render(request, 'fiscal/invoice_list.html', {
+        'invoices':       invoices,
+        'status_filter':  status,
+        'modelo_filter':  modelo,
+        'busca':          busca,
+        'status_choices': [
+            ('RASCUNHO',  'Rascunho'),
+            ('PENDENTE',  'Pendente'),
+            ('AUTORIZADA','Autorizada'),
+            ('REJEITADA', 'Rejeitada'),
+            ('CANCELADA', 'Cancelada'),
+            ('DENEGADA',  'Denegada'),
+        ],
+    })

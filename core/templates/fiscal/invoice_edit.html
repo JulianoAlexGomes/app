@@ -1,0 +1,396 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Editar NF {{ invoice.serie }}/{{ invoice.number }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+{% csrf_token %}
+
+<!-- ===== CABEÇALHO ===== -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <h2 class="mb-0">
+            {% if invoice.model == '55' %}NF-e{% else %}NFC-e{% endif %}
+            {{ invoice.serie }}/{{ invoice.number }}
+        </h2>
+        <span class="badge bg-primary fs-6 px-3 py-2">
+            {% if invoice.model == '55' %}🧾 NF-e{% else %}🛒 NFC-e{% endif %}
+        </span>
+        <span class="badge bg-secondary fs-6 px-3 py-2">{{ invoice.get_status_display }}</span>
+        {% if invoice.environment == '2' %}
+            <span class="badge bg-warning text-dark fs-6 px-3 py-2">⚠️ Homologação</span>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'invoice_detail' invoice.pk %}" class="btn btn-outline-secondary">← Cancelar</a>
+        <button type="submit" class="btn btn-primary fw-semibold px-4">💾 Salvar Alterações</button>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{% if 'error' in message.tags %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show">
+            {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- ===== DADOS GERAIS ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">📋 Dados Gerais</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">Natureza da Operação</label>
+                {{ form.nature_operation }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Finalidade</label>
+                {{ form.finality }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Indicador de Presença</label>
+                {{ form.presence_indicator }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Tipo Operação</label>
+                {{ form.operation_type }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Data Saída / Entrada</label>
+                {{ form.exit_date }}
+            </div>
+            <div class="col-md-8">
+                <label class="form-label fw-semibold">Informações Complementares</label>
+                {{ form.additional_info }}
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Informações ao Fisco</label>
+                {{ form.fiscal_info }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== DESTINATÁRIO ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">👤 Destinatário</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Nome / Razão Social</label>
+                {{ form.dest_name }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">CNPJ</label>
+                {{ form.dest_cnpj }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">CPF</label>
+                {{ form.dest_cpf }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Inscrição Estadual</label>
+                {{ form.dest_ie }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Indicador IE</label>
+                {{ form.dest_taxpayer_type }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">E-mail</label>
+                {{ form.dest_email }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">UF</label>
+                {{ form.dest_state }}
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">Logradouro</label>
+                {{ form.dest_street }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Número</label>
+                {{ form.dest_number }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Complemento</label>
+                {{ form.dest_complement }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Bairro</label>
+                {{ form.dest_neighborhood }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Cidade</label>
+                {{ form.dest_city }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">CEP</label>
+                {{ form.dest_zip_code }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ITENS ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">
+        📦 Itens da Nota Fiscal
+        <small class="text-muted fw-normal ms-2">— gross_total é recalculado automaticamente (qtd × preço)</small>
+    </div>
+    <div class="card-body p-0">
+
+        {{ item_formset.management_form }}
+
+        {% for item_form in item_formset %}
+        {# Hidden fields obrigatórios do formset #}
+        {{ item_form.id }}
+
+        <div class="border-bottom px-3 pt-3 pb-2 {% cycle '' 'bg-light' %}">
+
+            {# Linha 1: Produto + NCM + CFOP + UN + DEL #}
+            <div class="row g-2 mb-2">
+                <div class="col-md-5">
+                    <label class="form-label form-label-sm text-muted mb-1">Descrição</label>
+                    {{ item_form.description }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm text-muted mb-1">NCM</label>
+                    {{ item_form.ncm }}
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label form-label-sm text-muted mb-1">CFOP</label>
+                    {{ item_form.cfop }}
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label form-label-sm text-muted mb-1">UN</label>
+                    {{ item_form.unit }}
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label form-label-sm text-muted mb-1">Qtd</label>
+                    {{ item_form.quantity }}
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label form-label-sm text-muted mb-1">Preço Unit.</label>
+                    {{ item_form.unit_price }}
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label form-label-sm text-muted mb-1">Desconto</label>
+                    {{ item_form.discount }}
+                </div>
+            </div>
+
+            {# Linha 2: Campos fiscais + botão excluir #}
+            <div class="row g-2 align-items-end mb-1">
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">CST ICMS</label>
+                    {{ item_form.icms_cst }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">CSOSN</label>
+                    {{ item_form.icms_csosn }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">Alíq. ICMS %</label>
+                    {{ item_form.icms_rate }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">BC ICMS</label>
+                    {{ item_form.icms_bc }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">Vl. ICMS</label>
+                    {{ item_form.icms_value }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">CST PIS</label>
+                    {{ item_form.pis_cst }}
+                </div>
+                <div class="col-auto">
+                    <label class="form-label form-label-sm text-muted mb-1">CST COFINS</label>
+                    {{ item_form.cofins_cst }}
+                </div>
+                <div class="col-auto ms-auto">
+                    <label class="form-label form-label-sm text-muted mb-1 d-block">Excluir</label>
+                    <div class="form-check mt-1">
+                        {{ item_form.DELETE }}
+                        <label class="form-check-label text-danger small" for="{{ item_form.DELETE.id_for_label }}">
+                            remover
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            {# Erros do item #}
+            {% if item_form.errors %}
+                {% for field, errs in item_form.errors.items %}
+                <div class="text-danger small mt-1">{{ field }}: {{ errs|join:", " }}</div>
+                {% endfor %}
+            {% endif %}
+
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-4">Nenhum item cadastrado.</div>
+        {% endfor %}
+
+    </div>
+</div>
+
+<!-- ===== TOTAIS ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">
+        💰 Totais
+        <small class="text-muted fw-normal ms-2">— recalculados automaticamente ao salvar</small>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-2 col-6">
+                <label class="form-label fw-semibold">Produtos</label>
+                {{ form.total_products }}
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label fw-semibold">Desconto</label>
+                {{ form.total_discount }}
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label fw-semibold">Frete</label>
+                {{ form.total_freight }}
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label fw-semibold">Seguro</label>
+                {{ form.total_insurance }}
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label fw-semibold">Outras Desp.</label>
+                {{ form.total_other }}
+            </div>
+            <div class="col-md-2 col-6">
+                <label class="form-label fw-semibold text-success">Total da NF</label>
+                {{ form.total_nf }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== PAGAMENTOS ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">💳 Formas de Pagamento</div>
+    <div class="card-body p-0">
+        {{ payment_formset.management_form }}
+        <table class="table table-bordered mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Forma de Pagamento</th>
+                    <th style="width:160px">Valor (R$)</th>
+                    <th style="width:80px" class="text-center">Excluir</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pay_form in payment_formset %}
+                <tr>
+                    {{ pay_form.id }}
+                    <td>{{ pay_form.payment_code }}</td>
+                    <td>{{ pay_form.value }}</td>
+                    <td class="text-center align-middle">{{ pay_form.DELETE }}</td>
+                </tr>
+                {% if pay_form.errors %}
+                <tr class="table-danger">
+                    <td colspan="3" class="small text-danger">
+                        {% for field, errs in pay_form.errors.items %}{{ field }}: {{ errs|join:", " }} {% endfor %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ===== TRANSPORTE ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">🚚 Transporte</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Modalidade de Frete</label>
+                <select name="freight_mode" class="form-select">
+                    {% with fm=invoice.transport.freight_mode %}
+                    <option value="0" {% if fm == '0' %}selected{% endif %}>Remetente (CIF)</option>
+                    <option value="1" {% if fm == '1' %}selected{% endif %}>Destinatário (FOB)</option>
+                    <option value="2" {% if fm == '2' %}selected{% endif %}>Terceiros</option>
+                    <option value="3" {% if fm == '3' %}selected{% endif %}>Próprio – Emitente</option>
+                    <option value="4" {% if fm == '4' %}selected{% endif %}>Próprio – Destinatário</option>
+                    <option value="9" {% if fm == '9' or not fm %}selected{% endif %}>Sem Frete</option>
+                    {% endwith %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Transportadora</label>
+                <input type="text" name="carrier_name" class="form-control"
+                       value="{{ invoice.transport.carrier_name|default:'' }}" maxlength="60">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">CNPJ Transp.</label>
+                <input type="text" name="carrier_cnpj" class="form-control"
+                       value="{{ invoice.transport.carrier_cnpj|default:'' }}" maxlength="14">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Placa</label>
+                <input type="text" name="vehicle_plate" class="form-control"
+                       value="{{ invoice.transport.vehicle_plate|default:'' }}" maxlength="8">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">UF Placa</label>
+                <input type="text" name="vehicle_state" class="form-control"
+                       value="{{ invoice.transport.vehicle_state|default:'' }}" maxlength="2">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Qtde Volumes</label>
+                <input type="number" name="volume_qty" class="form-control" min="0" step="1"
+                       value="{{ invoice.transport.volume_qty|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Espécie</label>
+                <input type="text" name="volume_species" class="form-control"
+                       value="{{ invoice.transport.volume_species|default:'' }}" maxlength="60">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Peso Bruto (kg)</label>
+                <input type="number" name="gross_weight" class="form-control" min="0" step="0.001"
+                       value="{{ invoice.transport.gross_weight|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Peso Líquido (kg)</label>
+                <input type="number" name="net_weight" class="form-control" min="0" step="0.001"
+                       value="{{ invoice.transport.net_weight|default:'' }}">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== BOTÃO FINAL ===== -->
+<div class="d-flex justify-content-between align-items-center mb-5">
+    <a href="{% url 'invoice_detail' invoice.pk %}" class="btn btn-outline-secondary px-4">← Cancelar</a>
+    <button type="submit" class="btn btn-primary btn-lg px-5 fw-semibold">💾 Salvar Alterações</button>
+</div>
+
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Auto-calcula Vl. ICMS ao mudar BC ou Alíquota
+    document.querySelectorAll('[name$="-icms_bc"], [name$="-icms_rate"]').forEach(function (el) {
+        el.addEventListener('input', function () {
+            var row  = el.closest('.border-bottom');
+            if (!row) return;
+            var bc   = parseFloat(row.querySelector('[name$="-icms_bc"]')?.value   || 0);
+            var rate = parseFloat(row.querySelector('[name$="-icms_rate"]')?.value || 0);
+            var valEl = row.querySelector('[name$="-icms_value"]');
+            if (valEl) valEl.value = (bc * rate / 100).toFixed(2);
+        });
+    });
+});
+</script>
+{% endblock %}

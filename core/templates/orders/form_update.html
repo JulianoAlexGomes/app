@@ -35,7 +35,33 @@
         </span>
     </div>
 
-    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">← Voltar</a>
+    <div class="d-flex gap-2">
+
+        <!-- ===== BOTÃO GERAR NF — só aparece quando FATURADO e sem NF ativa ===== -->
+        {% if order.status == 'FATURADO' %}
+            {% with nf_ativa=order.invoices.filter %}
+                {% if not invoice_ativa %}
+                    <button type="button"
+                            class="btn btn-success fw-semibold px-4"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalGerarNF">
+                        🧾 Gerar
+                        {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}NF{% endif %}
+                    </button>
+                {% else %}
+                    <!-- NF já existe — link para visualizar -->
+                    <a href="{% url 'invoice_detail' invoice_ativa.pk %}"
+                       class="btn btn-outline-success fw-semibold px-4">
+                        🧾 Ver
+                        {% if order.document_model == '55' %}NF-e{% else %}NFC-e{% endif %}
+                        {{ invoice_ativa.serie }}/{{ invoice_ativa.number }}
+                    </a>
+                {% endif %}
+            {% endwith %}
+        {% endif %}
+
+        <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">← Voltar</a>
+    </div>
 </div>
 
 {% if order.status not in 'DIGITACAO,ORCAMENTO' %}
@@ -110,31 +136,17 @@
                     <input id="addition" type="number" step="0.01" class="form-control text-end" value="0">
                 </div>
 
-                <!-- Preview fiscal (aparece após selecionar produto) -->
+                <!-- Preview fiscal -->
                 <div class="col-12" id="fiscal-preview" style="display:none">
                     <div class="alert alert-light border small py-2 mb-0">
                         <div class="row g-2 align-items-center">
-                            <div class="col-auto">
-                                <strong>Fiscal:</strong>
-                            </div>
-                            <div class="col-auto">
-                                CFOP: <strong id="fp-cfop">—</strong>
-                            </div>
-                            <div class="col-auto">
-                                NCM: <strong id="fp-ncm">—</strong>
-                            </div>
-                            <div class="col-auto">
-                                CST/CSOSN: <strong id="fp-cst">—</strong>
-                            </div>
-                            <div class="col-auto">
-                                ICMS: <strong id="fp-icms">—</strong>
-                            </div>
-                            <div class="col-auto">
-                                PIS: <strong id="fp-pis">—</strong>
-                            </div>
-                            <div class="col-auto">
-                                COFINS: <strong id="fp-cofins">—</strong>
-                            </div>
+                            <div class="col-auto"><strong>Fiscal:</strong></div>
+                            <div class="col-auto">CFOP: <strong id="fp-cfop">—</strong></div>
+                            <div class="col-auto">NCM: <strong id="fp-ncm">—</strong></div>
+                            <div class="col-auto">CST/CSOSN: <strong id="fp-cst">—</strong></div>
+                            <div class="col-auto">ICMS: <strong id="fp-icms">—</strong></div>
+                            <div class="col-auto">PIS: <strong id="fp-pis">—</strong></div>
+                            <div class="col-auto">COFINS: <strong id="fp-cofins">—</strong></div>
                         </div>
                     </div>
                 </div>
@@ -178,7 +190,6 @@
                         <th style="width:4%"></th>
                     </tr>
                 </thead>
-
                 <tbody id="items-table">
                     {% for form in formset %}
                     <tr class="item-form">
@@ -187,15 +198,9 @@
                         <td>{{ form.price }}</td>
                         <td>{{ form.discount }}</td>
                         <td>{{ form.addition }}</td>
+                        <td class="text-center text-muted small">{{ form.instance.cfop|default:"—" }}</td>
                         <td class="text-center text-muted small">
-                            {{ form.instance.cfop|default:"—" }}
-                        </td>
-                        <td class="text-center text-muted small">
-                            {% if form.instance.icms_rate %}
-                                {{ form.instance.icms_rate }}%
-                            {% else %}
-                                —
-                            {% endif %}
+                            {% if form.instance.icms_rate %}{{ form.instance.icms_rate }}%{% else %}—{% endif %}
                         </td>
                         <td class="subtotal text-end fw-semibold">R$ 0,00</td>
                         <td class="text-center">
@@ -228,7 +233,6 @@
                 </span>
             </div>
         </div>
-
         <div class="card-body">
             <table class="table table-bordered">
                 <thead>
@@ -318,6 +322,130 @@
 
 </form>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL — GERAR NF-e / NFC-e
+════════════════════════════════════════════════════════════════ -->
+{% if order.status == 'FATURADO' and not invoice_ativa %}
+<div class="modal fade" id="modalGerarNF" tabindex="-1" aria-labelledby="modalGerarNFLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="modalGerarNFLabel">
+                    🧾 Confirmar Geração de
+                    {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}Nota Fiscal{% endif %}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body pt-3">
+
+                <!-- Resumo do pedido -->
+                <div class="rounded-3 p-3 mb-3" style="background:#f8f9fa;">
+                    <div class="row g-2 small">
+                        <div class="col-6">
+                            <span class="text-muted">Pedido</span><br>
+                            <strong>#{{ order.id }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Modelo</span><br>
+                            <strong>
+                                {% if order.document_model == '55' %}NF-e (55){% elif order.document_model == '65' %}NFC-e (65){% else %}—{% endif %}
+                            </strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Cliente</span><br>
+                            <strong>{{ order.client.name|default:"Consumidor Final" }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Total</span><br>
+                            <strong class="text-success">R$ {{ order.total_amount|floatformat:2 }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Série</span><br>
+                            <strong>
+                                {% if order.document_model == '55' %}{{ order.business.nfe_series }}{% else %}{{ order.business.nfce_series }}{% endif %}
+                            </strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Próximo número</span><br>
+                            <strong>
+                                {% if order.document_model == '55' %}{{ order.business.nfe_last_number|add:1 }}{% else %}{{ order.business.nfce_last_number|add:1 }}{% endif %}
+                            </strong>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Ambiente</span><br>
+                            {% if order.business.nfe_environment == 2 %}
+                                <span class="badge bg-warning text-dark">Homologação</span>
+                            {% else %}
+                                <span class="badge bg-success">Produção</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Itens</span><br>
+                            <strong>{{ order.items.count }} produto{{ order.items.count|pluralize }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aviso homologação -->
+                {% if order.business.nfe_environment == 2 %}
+                <div class="alert alert-warning py-2 small mb-3">
+                    ⚠️ <strong>Ambiente de Homologação</strong> — esta NF <u>não tem validade fiscal</u>.
+                    Configure o ambiente em <strong>Empresa → Editar</strong> para emitir em Produção.
+                </div>
+                {% endif %}
+
+                <!-- Aviso itens sem fiscal -->
+                {% for item in order.items.all %}
+                    {% if not item.cfop %}
+                    <div class="alert alert-danger py-2 small mb-3">
+                        ⛔ O item <strong>{{ item.variant.product.name }}</strong> não possui CFOP definido.
+                        Salve o pedido para aplicar as regras fiscais antes de gerar a NF.
+                    </div>
+                    {% endif %}
+                {% endfor %}
+
+                <p class="text-muted small mb-0">
+                    A nota será gerada com status <strong>Rascunho</strong>. Você poderá revisar antes de transmitir à SEFAZ.
+                </p>
+
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Cancelar
+                </button>
+
+                <!-- POST para a view gerar_nfe -->
+                <form method="post" action="{% url 'gerar_nfe' order.pk %}" id="form-gerar-nf">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success fw-semibold px-4" id="btn-confirmar-gerar">
+                        <span id="btn-gerar-texto">
+                            ✅ Gerar
+                            {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}NF{% endif %}
+                        </span>
+                        <span id="btn-gerar-loading" class="d-none">
+                            <span class="spinner-border spinner-border-sm me-1"></span> Gerando...
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+/* Spinner enquanto gera a NF */
+document.getElementById('form-gerar-nf').addEventListener('submit', function () {
+    document.getElementById('btn-gerar-texto').classList.add('d-none');
+    document.getElementById('btn-gerar-loading').classList.remove('d-none');
+    document.getElementById('btn-confirmar-gerar').disabled = true;
+});
+</script>
+{% endif %}
+
 <!-- ===== TEMPLATES DJANGO (hidden) ===== -->
 <template id="empty-payment-template">
 <tr class="payment-row">
@@ -360,13 +488,11 @@
 
 <script>
 /* ================================================================
-   PREVIEW FISCAL — busca dados ao selecionar produto
+   PREVIEW FISCAL
 ================================================================ */
 const ORDER_ID   = {{ order.id }};
 const FISCAL_URL = "{% url 'ajax_fiscal_item' %}";
 
-// Chamado pelo order_form.js quando um produto é selecionado
-// Exposto globalmente para o JS externo poder usar
 window.fetchFiscalPreview = function (variantId, quantity, price, discount, addition) {
 
     if (!variantId) {
@@ -387,7 +513,6 @@ window.fetchFiscalPreview = function (variantId, quantity, price, discount, addi
     fetch(`${FISCAL_URL}?${params}`)
         .then(r => r.json())
         .then(function (data) {
-
             const preview = document.getElementById('fiscal-preview');
             const warning = document.getElementById('fiscal-warning');
 
@@ -419,9 +544,8 @@ window.fetchFiscalPreview = function (variantId, quantity, price, discount, addi
 };
 
 /* ================================================================
-   FINANCEIRO AVANÇADO
+   FINANCEIRO
 ================================================================ */
-
 document.addEventListener('DOMContentLoaded', function () {
 
     const totalPedidoEl     = document.getElementById('total-pedido');
@@ -431,45 +555,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const parcialMsg        = document.getElementById('msg-parcial');
     const form              = document.querySelector('form');
 
-    function parseValue(value) {
-        if (!value) return 0;
-        return parseFloat(value) || 0;
+    function parseValue(v) { return parseFloat(v) || 0; }
+    function formatMoney(v) {
+        return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
-
-    function formatMoney(value) {
-        return value.toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-
-    /* ===============================
-       CALCULAR SALDO
-    =============================== */
 
     window.calcularSaldo = function () {
-
         const totalPedido = parseFloat(totalPedidoEl.dataset.valor || 0);
         let totalPagamentos = 0;
 
         document.querySelectorAll('#payments-table tr').forEach(function (row) {
-
             if (row.style.display === 'none') return;
-
             const input = row.querySelector('input[name$="total_value"]');
-
-            if (input) {
-                totalPagamentos += parseValue(input.value);
-            }
+            if (input) totalPagamentos += parseValue(input.value);
         });
 
         let saldo = totalPedido - totalPagamentos;
-
         if (saldo < 0) saldo = 0;
 
         totalPagamentosEl.innerText = 'R$ ' + formatMoney(totalPagamentos);
         saldoEl.innerText           = 'R$ ' + formatMoney(saldo);
-
         saldoEl.classList.remove('text-success', 'text-danger');
         pagoMsg.classList.add('d-none');
         parcialMsg.classList.add('d-none');
@@ -485,14 +590,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return saldo;
     };
 
-    /* ===============================
-       BLOQUEAR SALVAR SE SALDO > 0
-    =============================== */
-
     form.addEventListener('submit', function (e) {
-
         const saldo = calcularSaldo();
-
         if (saldo > 0) {
             e.preventDefault();
             alert('Não é possível salvar pedido com saldo pendente.');
@@ -500,74 +599,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    /* ===============================
-       ADICIONAR PAGAMENTO (FORMSET)
-    =============================== */
-
     document.getElementById('add-payment').addEventListener('click', function () {
-
         const totalForms = document.getElementById('id_payments-TOTAL_FORMS');
         const count      = parseInt(totalForms.value);
-
         const html = document.getElementById('empty-payment-template')
                              .innerHTML.replace(/__prefix__/g, count);
-
-        document.getElementById('payments-table')
-                .insertAdjacentHTML('beforeend', html);
-
+        document.getElementById('payments-table').insertAdjacentHTML('beforeend', html);
         totalForms.value = count + 1;
     });
 
-    /* ===============================
-       REMOVER PAGAMENTO
-    =============================== */
-
     document.addEventListener('click', function (e) {
-
         if (e.target.classList.contains('remove-payment')) {
-
             const row = e.target.closest('tr');
             const cb  = row.querySelector('input[type="checkbox"]');
-
             if (cb) cb.checked = true;
-
             row.style.display = 'none';
-
             calcularSaldo();
         }
     });
 
-    /* ===============================
-       RECALCULAR AO DIGITAR
-    =============================== */
-
     document.addEventListener('input', function (e) {
-        if (e.target.name && e.target.name.includes('total_value')) {
-            calcularSaldo();
-        }
+        if (e.target.name && e.target.name.includes('total_value')) calcularSaldo();
     });
 
     calcularSaldo();
 });
-
 </script>
 
 <style>
-/* Bloqueio de edição */
 .order-locked input,
 .order-locked select,
 .order-locked textarea,
-.order-locked button {
-    pointer-events: none;
-    opacity: 0.6;
-}
+.order-locked button { pointer-events: none; opacity: 0.6; }
 .order-locked input,
 .order-locked select,
-.order-locked textarea {
-    background-color: #f8f9fa !important;
-}
+.order-locked textarea { background-color: #f8f9fa !important; }
 
-/* Select2 */
 .select2-container .select2-selection--single          { height: 38px; padding: 4px 8px; }
 .select2-container--default .select2-selection--single { border: 1px solid #ced4da; border-radius: .375rem; }
 .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 28px; }

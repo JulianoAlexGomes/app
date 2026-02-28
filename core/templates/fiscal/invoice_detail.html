@@ -1,0 +1,579 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ invoice.get_model_display }} {{ invoice.serie }}/{{ invoice.number }}{% endblock %}
+
+{% block content %}
+
+<!-- ===== CABEÇALHO ===== -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <h2 class="mb-0">
+            {% if invoice.model == '55' %}NF-e{% else %}NFC-e{% endif %}
+            {{ invoice.serie }}/{{ invoice.number }}
+        </h2>
+
+        <!-- Badge Modelo -->
+        {% if invoice.model == '55' %}
+            <span class="badge bg-primary fs-6 px-3 py-2">🧾 NF-e</span>
+        {% else %}
+            <span class="badge bg-success fs-6 px-3 py-2">🛒 NFC-e</span>
+        {% endif %}
+
+        <!-- Badge Status -->
+        <span class="badge fs-6 px-3 py-2
+            {% if invoice.status == 'RASCUNHO' %}bg-secondary
+            {% elif invoice.status == 'PENDENTE' %}bg-warning text-dark
+            {% elif invoice.status == 'AUTORIZADA' %}bg-success
+            {% elif invoice.status == 'REJEITADA' %}bg-danger
+            {% elif invoice.status == 'CANCELADA' %}bg-dark
+            {% elif invoice.status == 'DENEGADA' %}bg-danger
+            {% else %}bg-secondary
+            {% endif %}">
+            {{ invoice.get_status_display }}
+        </span>
+
+        <!-- Badge Ambiente -->
+        {% if invoice.environment == '2' %}
+            <span class="badge bg-warning text-dark fs-6 px-3 py-2">⚠️ Homologação</span>
+        {% endif %}
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+
+        {% if invoice.is_editable %}
+            <a href="{% url 'invoice_update' invoice.pk %}"
+            class="btn btn-warning fw-semibold px-4">
+                ✏️ Editar NF
+            </a>
+        {% endif %}
+
+        <!-- Transmitir (só rascunho/rejeitada) -->
+        {% if invoice.status == 'RASCUNHO' or invoice.status == 'REJEITADA' %}
+            <form method="post" action="{% url 'invoice_transmit' invoice.pk %}" id="form-transmitir">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success fw-semibold px-4"
+                        onclick="return confirm('Confirma a transmissão desta NF para a SEFAZ?')">
+                    📡 Transmitir à SEFAZ
+                </button>
+            </form>
+        {% endif %}
+
+        <!-- Cancelar (só autorizada) -->
+        {% if invoice.status == 'AUTORIZADA' %}
+            <button type="button" class="btn btn-outline-danger fw-semibold"
+                    data-bs-toggle="modal" data-bs-target="#modalCancelar">
+                🚫 Cancelar NF
+            </button>
+        {% endif %}
+
+        <!-- Voltar ao pedido -->
+        <a href="{% url 'order_update' invoice.order.pk %}" class="btn btn-outline-secondary">
+            ← Pedido #{{ invoice.order.pk }}
+        </a>
+    </div>
+</div>
+
+<!-- Mensagens -->
+{% comment %} {% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %} {% endcomment %}
+
+<!-- Alerta retorno SEFAZ -->
+{% if invoice.return_code and invoice.return_code != '100' %}
+<div class="alert alert-danger d-flex align-items-start gap-2 mb-3">
+    <div style="font-size:1.4rem">⛔</div>
+    <div>
+        <strong>Retorno SEFAZ ({{ invoice.return_code }})</strong><br>
+        {{ invoice.return_message }}
+    </div>
+</div>
+{% endif %}
+
+{% if invoice.status == 'AUTORIZADA' and invoice.protocol %}
+<div class="alert alert-success d-flex align-items-start gap-2 mb-3">
+    <div style="font-size:1.4rem">✅</div>
+    <div>
+        <strong>NF Autorizada</strong> — Protocolo: <strong>{{ invoice.protocol }}</strong>
+        {% if invoice.authorized_at %}| {{ invoice.authorized_at|date:"d/m/Y H:i" }}{% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ===== CABEÇALHO DA NF ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">
+        📋 Dados da Nota Fiscal
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Modelo</label>
+                <div class="fw-semibold">{{ invoice.get_model_display }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Série / Número</label>
+                <div class="fw-semibold">{{ invoice.serie }} / {{ invoice.number }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Data Emissão</label>
+                <div class="fw-semibold">{{ invoice.issue_date|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Natureza da Operação</label>
+                <div class="fw-semibold">{{ invoice.nature_operation }}</div>
+            </div>
+
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Finalidade</label>
+                <div class="fw-semibold">{{ invoice.get_finality_display }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Indicador Presença</label>
+                <div class="fw-semibold">{{ invoice.get_presence_indicator_display }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Ambiente</label>
+                <div class="fw-semibold">
+                    {% if invoice.environment == '1' %}
+                        <span class="text-success">Produção</span>
+                    {% else %}
+                        <span class="text-warning">Homologação</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label text-muted small mb-0">Chave de Acesso</label>
+                <div class="fw-semibold text-truncate small" title="{{ invoice.access_key }}">
+                    {{ invoice.short_key|default:"—" }}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ===== EMITENTE / DESTINATÁRIO ===== -->
+<div class="row g-4 mb-4">
+
+    <!-- EMITENTE -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-semibold py-3">🏢 Emitente</div>
+            <div class="card-body">
+                <div class="row g-2 small">
+                    <div class="col-12">
+                        <span class="text-muted">Razão Social</span><br>
+                        <strong>{{ invoice.emit_name }}</strong>
+                        {% if invoice.emit_fantasy %}
+                            <span class="text-muted"> ({{ invoice.emit_fantasy }})</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted">CNPJ</span><br>
+                        <strong>{{ invoice.emit_cnpj }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted">IE</span><br>
+                        <strong>{{ invoice.emit_ie|default:"—" }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted">Regime Tributário</span><br>
+                        <strong>{{ invoice.get_emit_tax_regime_display }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted">UF</span><br>
+                        <strong>{{ invoice.emit_state }}</strong>
+                    </div>
+                    <div class="col-12">
+                        <span class="text-muted">Endereço</span><br>
+                        <strong>
+                            {{ invoice.emit_street }}, {{ invoice.emit_number }}
+                            {% if invoice.emit_complement %} – {{ invoice.emit_complement }}{% endif %},
+                            {{ invoice.emit_district }}, {{ invoice.emit_city }}/{{ invoice.emit_state }}
+                            – CEP {{ invoice.emit_zip_code }}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DESTINATÁRIO -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-semibold py-3">👤 Destinatário</div>
+            <div class="card-body">
+                <div class="row g-2 small">
+                    <div class="col-12">
+                        <span class="text-muted">Nome / Razão Social</span><br>
+                        <strong>{{ invoice.dest_name }}</strong>
+                    </div>
+                    {% if invoice.dest_cnpj %}
+                    <div class="col-6">
+                        <span class="text-muted">CNPJ</span><br>
+                        <strong>{{ invoice.dest_cnpj }}</strong>
+                    </div>
+                    {% elif invoice.dest_cpf %}
+                    <div class="col-6">
+                        <span class="text-muted">CPF</span><br>
+                        <strong>{{ invoice.dest_cpf }}</strong>
+                    </div>
+                    {% endif %}
+                    <div class="col-6">
+                        <span class="text-muted">IE / Indicador</span><br>
+                        <strong>{{ invoice.dest_ie|default:invoice.get_dest_taxpayer_type_display }}</strong>
+                    </div>
+                    {% if invoice.dest_state %}
+                    <div class="col-6">
+                        <span class="text-muted">UF</span><br>
+                        <strong>{{ invoice.dest_state }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if invoice.dest_city %}
+                    <div class="col-12">
+                        <span class="text-muted">Endereço</span><br>
+                        <strong>
+                            {% if invoice.dest_street %}{{ invoice.dest_street }}, {{ invoice.dest_number }}{% if invoice.dest_complement %} – {{ invoice.dest_complement }}{% endif %},
+                            {{ invoice.dest_neighborhood }}, {% endif %}
+                            {{ invoice.dest_city }}/{{ invoice.dest_state }}
+                            {% if invoice.dest_zip_code %}– CEP {{ invoice.dest_zip_code }}{% endif %}
+                        </strong>
+                    </div>
+                    {% endif %}
+                    {% if invoice.dest_email %}
+                    <div class="col-6">
+                        <span class="text-muted">E-mail</span><br>
+                        <strong>{{ invoice.dest_email }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== ITENS ===== -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">📦 Itens da Nota Fiscal</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:4%">#</th>
+                        <th style="width:6%">Código</th>
+                        <th style="width:24%">Descrição</th>
+                        <th style="width:7%" class="text-center">NCM</th>
+                        <th style="width:5%" class="text-center">CFOP</th>
+                        <th style="width:5%" class="text-center">Qtd</th>
+                        <th style="width:8%" class="text-end">Preço Unit.</th>
+                        <th style="width:8%" class="text-end">Total</th>
+                        <th style="width:5%" class="text-center">CST/CSOSN</th>
+                        <th style="width:6%" class="text-center">ICMS%</th>
+                        <th style="width:8%" class="text-end">Vl. ICMS</th>
+                        <th style="width:7%" class="text-end">PIS</th>
+                        <th style="width:7%" class="text-end">COFINS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in invoice.items.all %}
+                    <tr>
+                        <td class="text-muted small">{{ item.item_number }}</td>
+                        <td class="small text-muted">{{ item.product_code }}</td>
+                        <td>
+                            <div class="fw-semibold">{{ item.description }}</div>
+                            <div class="text-muted small">{{ item.unit }} | {{ item.get_origin_display|default:item.origin }}</div>
+                        </td>
+                        <td class="text-center small">{{ item.ncm }}</td>
+                        <td class="text-center small fw-semibold">{{ item.cfop }}</td>
+                        <td class="text-center">{{ item.quantity|floatformat:0 }}</td>
+                        <td class="text-end">R$ {{ item.unit_price|floatformat:2 }}</td>
+                        <td class="text-end fw-semibold">R$ {{ item.net_total|floatformat:2 }}</td>
+                        <td class="text-center small">
+                            {% if item.icms_csosn %}
+                                <span class="badge bg-info text-dark">{{ item.icms_csosn }}</span>
+                            {% elif item.icms_cst %}
+                                <span class="badge bg-secondary">{{ item.icms_cst }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-center small">
+                            {% if item.icms_rate %}{{ item.icms_rate }}%{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end small">
+                            {% if item.icms_value %}R$ {{ item.icms_value|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end small">
+                            {% if item.pis_value %}R$ {{ item.pis_value|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end small">
+                            {% if item.cofins_value %}R$ {{ item.cofins_value|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="13" class="text-center text-muted py-4">Nenhum item cadastrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TOTAIS + PAGAMENTOS ===== -->
+<div class="row g-4 mb-4">
+
+    <!-- TOTAIS -->
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-semibold py-3">💰 Totais</div>
+            <div class="card-body">
+                <div class="row g-2 small">
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">Produtos</span>
+                        <strong>R$ {{ invoice.total_products|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">Desconto</span>
+                        <strong class="text-danger">- R$ {{ invoice.total_discount|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">Frete</span>
+                        <strong>R$ {{ invoice.total_freight|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">Seguro</span>
+                        <strong>R$ {{ invoice.total_insurance|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">BC ICMS</span>
+                        <strong>R$ {{ invoice.total_bc_icms|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">ICMS</span>
+                        <strong>R$ {{ invoice.total_icms|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">ICMS ST</span>
+                        <strong>R$ {{ invoice.total_icms_st|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">PIS</span>
+                        <strong>R$ {{ invoice.total_pis|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-6 d-flex justify-content-between border-bottom pb-1">
+                        <span class="text-muted">COFINS</span>
+                        <strong>R$ {{ invoice.total_cofins|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-12 d-flex justify-content-between pt-2">
+                        <span class="fw-bold fs-6">Total da NF</span>
+                        <strong class="fs-5 text-success">R$ {{ invoice.total_nf|floatformat:2 }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGAMENTOS -->
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light fw-semibold py-3">💳 Formas de Pagamento</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Forma</th>
+                            <th class="text-end">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pag in invoice.payments.all %}
+                        <tr>
+                            <td>{{ pag.get_payment_code_display }}</td>
+                            <td class="text-end fw-semibold">R$ {{ pag.value|floatformat:2 }}</td>
+                        </tr>
+                        {% if pag.change %}
+                        <tr class="table-warning">
+                            <td class="text-muted small">Troco</td>
+                            <td class="text-end small">R$ {{ pag.change|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-muted text-center py-3">Sem pagamentos</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== TRANSPORTE ===== -->
+{% if invoice.transport %}
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">🚚 Transporte</div>
+    <div class="card-body">
+        <div class="row g-3 small">
+            <div class="col-md-3 col-6">
+                <span class="text-muted">Modalidade de Frete</span><br>
+                <strong>{{ invoice.transport.get_freight_mode_display }}</strong>
+            </div>
+            {% if invoice.transport.carrier_name %}
+            <div class="col-md-3 col-6">
+                <span class="text-muted">Transportadora</span><br>
+                <strong>{{ invoice.transport.carrier_name }}</strong>
+            </div>
+            <div class="col-md-3 col-6">
+                <span class="text-muted">CNPJ/CPF</span><br>
+                <strong>{{ invoice.transport.carrier_cnpj|default:invoice.transport.carrier_cpf|default:"—" }}</strong>
+            </div>
+            <div class="col-md-3 col-6">
+                <span class="text-muted">UF</span><br>
+                <strong>{{ invoice.transport.carrier_state|default:"—" }}</strong>
+            </div>
+            {% endif %}
+            {% if invoice.transport.vehicle_plate %}
+            <div class="col-md-3 col-6">
+                <span class="text-muted">Placa</span><br>
+                <strong>{{ invoice.transport.vehicle_plate }}/{{ invoice.transport.vehicle_state }}</strong>
+            </div>
+            {% endif %}
+            {% if invoice.transport.volume_qty %}
+            <div class="col-md-3 col-6">
+                <span class="text-muted">Volumes</span><br>
+                <strong>{{ invoice.transport.volume_qty|floatformat:0 }} {{ invoice.transport.volume_species }}</strong>
+            </div>
+            <div class="col-md-3 col-6">
+                <span class="text-muted">Peso Bruto / Líquido</span><br>
+                <strong>{{ invoice.transport.gross_weight|floatformat:3|default:"—" }} / {{ invoice.transport.net_weight|floatformat:3|default:"—" }} kg</strong>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ===== LOG DE TRANSMISSÕES ===== -->
+{% if invoice.logs.exists %}
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">📜 Histórico de Transmissões</div>
+    <div class="card-body p-0">
+        <table class="table table-sm table-striped mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Data/Hora</th>
+                    <th>Ação</th>
+                    <th>Resultado</th>
+                    <th>Código</th>
+                    <th>Mensagem</th>
+                    <th class="text-end">Duração</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in invoice.logs.all %}
+                <tr>
+                    <td class="small text-muted">{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
+                    <td class="small">{{ log.get_action_display }}</td>
+                    <td>
+                        {% if log.result == 'SUCCESS' %}
+                            <span class="badge bg-success">Sucesso</span>
+                        {% elif log.result == 'ERROR' %}
+                            <span class="badge bg-danger">Erro</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Aviso</span>
+                        {% endif %}
+                    </td>
+                    <td class="small">{{ log.return_code|default:"—" }}</td>
+                    <td class="small">{{ log.message|truncatechars:80 }}</td>
+                    <td class="text-end small text-muted">
+                        {% if log.duration_ms %}{{ log.duration_ms }}ms{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- ===== INFORMAÇÕES ADICIONAIS ===== -->
+{% if invoice.additional_info or invoice.fiscal_info %}
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light fw-semibold py-3">📝 Informações Adicionais</div>
+    <div class="card-body small">
+        {% if invoice.additional_info %}
+            <p class="mb-1"><strong>Complementares:</strong> {{ invoice.additional_info }}</p>
+        {% endif %}
+        {% if invoice.fiscal_info %}
+            <p class="mb-0"><strong>Ao Fisco:</strong> {{ invoice.fiscal_info }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL — CANCELAR NF
+════════════════════════════════════════════════════════════════ -->
+{% if invoice.status == 'AUTORIZADA' %}
+<div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">🚫 Cancelar Nota Fiscal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <form method="post" action="{% url 'invoice_cancel' invoice.pk %}">
+                {% csrf_token %}
+                <div class="modal-body pt-3">
+
+                    <div class="rounded-3 p-3 mb-3 bg-light small">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <span class="text-muted">NF</span><br>
+                                <strong>{{ invoice.serie }}/{{ invoice.number }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted">Protocolo</span><br>
+                                <strong>{{ invoice.protocol }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning small py-2">
+                        ⚠️ O cancelamento é <strong>irreversível</strong> e só é permitido dentro do prazo legal (geralmente 24h da autorização para NFC-e ou até o final do dia para NF-e).
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Justificativa <span class="text-danger">*</span></label>
+                        <textarea name="justificativa" class="form-control" rows="3"
+                                  minlength="15" maxlength="255" required
+                                  placeholder="Mínimo 15 caracteres — descreva o motivo do cancelamento"></textarea>
+                        <div class="form-text">Mínimo 15 caracteres.</div>
+                    </div>
+
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" class="btn btn-danger fw-semibold px-4">🚫 Confirmar Cancelamento</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

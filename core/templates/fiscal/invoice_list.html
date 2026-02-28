@@ -1,0 +1,151 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Notas Fiscais{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">🧾 Notas Fiscais</h2>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label form-label-sm text-muted mb-1">Buscar</label>
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Número, destinatário, chave..."
+                       value="{{ busca }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label form-label-sm text-muted mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Todos os status</option>
+                    {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label form-label-sm text-muted mb-1">Modelo</label>
+                <select name="modelo" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    <option value="55" {% if modelo_filter == '55' %}selected{% endif %}>NF-e (55)</option>
+                    <option value="65" {% if modelo_filter == '65' %}selected{% endif %}>NFC-e (65)</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm px-3">🔍 Filtrar</button>
+                <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary btn-sm px-3">✕ Limpar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if invoices %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="width:80px">Série/Nº</th>
+                        <th style="width:70px">Modelo</th>
+                        <th>Destinatário</th>
+                        <th style="width:140px">Emissão</th>
+                        <th class="text-end" style="width:120px">Total</th>
+                        <th style="width:120px">Status</th>
+                        <th style="width:80px">Ambiente</th>
+                        <th style="width:130px" class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nf in invoices %}
+                    <tr>
+                        <td class="ps-3 fw-semibold text-primary">
+                            {{ nf.serie }}/{{ nf.number }}
+                        </td>
+                        <td>
+                            {% if nf.model == '55' %}
+                                <span class="badge bg-primary">NF-e</span>
+                            {% else %}
+                                <span class="badge bg-success">NFC-e</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ nf.dest_name|default:"—" }}</div>
+                            <small class="text-muted">
+                                {% if nf.dest_cnpj %}CNPJ: {{ nf.dest_cnpj }}{% elif nf.dest_cpf %}CPF: {{ nf.dest_cpf }}{% endif %}
+                            </small>
+                        </td>
+                        <td class="text-muted small">
+                            {{ nf.issue_date|date:"d/m/Y H:i" }}
+                        </td>
+                        <td class="text-end fw-semibold">
+                            R$ {{ nf.total_nf|floatformat:2 }}
+                        </td>
+                        <td>
+                            {% if nf.status == 'AUTORIZADA' %}
+                                <span class="badge bg-success">✓ Autorizada</span>
+                            {% elif nf.status == 'RASCUNHO' %}
+                                <span class="badge bg-secondary">Rascunho</span>
+                            {% elif nf.status == 'REJEITADA' %}
+                                <span class="badge bg-danger">Rejeitada</span>
+                            {% elif nf.status == 'CANCELADA' %}
+                                <span class="badge bg-warning text-dark">Cancelada</span>
+                            {% elif nf.status == 'PENDENTE' %}
+                                <span class="badge bg-info">Pendente</span>
+                            {% elif nf.status == 'DENEGADA' %}
+                                <span class="badge bg-dark">Denegada</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ nf.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if nf.environment == '2' %}
+                                <span class="badge bg-warning text-dark">Homolog.</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">Produção</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex gap-1 justify-content-center">
+                                <a href="{% url 'invoice_detail' nf.pk %}"
+                                   class="btn btn-outline-primary btn-sm"
+                                   title="Ver NF">👁</a>
+                                {% if nf.is_editable %}
+                                <a href="{% url 'invoice_update' nf.pk %}"
+                                   class="btn btn-outline-secondary btn-sm"
+                                   title="Editar">✏️</a>
+                                {% endif %}
+                                <a href="{% url 'invoice_xml_debug' nf.pk %}"
+                                   class="btn btn-outline-dark btn-sm"
+                                   title="Ver XML" target="_blank">📄</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+            <div style="font-size:3rem">🧾</div>
+            <p class="mt-2 mb-0">Nenhuma nota fiscal encontrada.</p>
+            {% if busca or status_filter or modelo_filter %}
+            <a href="{% url 'invoice_list' %}" class="btn btn-sm btn-outline-secondary mt-3">Limpar filtros</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% if invoices %}
+    <div class="card-footer text-muted small py-2 px-3">
+        {{ invoices|length }} nota{{ invoices|length|pluralize }} encontrada{{ invoices|length|pluralize }}
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}XML Debug — NF {{ invoice.serie }}/{{ invoice.number }}{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <h2 class="mb-0">📄 XML da NF</h2>
+        <span class="badge bg-primary fs-6">{{ invoice.serie }}/{{ invoice.number }}</span>
+        <span class="badge bg-secondary">{{ invoice.get_status_display }}</span>
+        {% if invoice.environment == '2' %}
+        <span class="badge bg-warning text-dark">⚠️ Homologação</span>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        <button onclick="copiarXml()" class="btn btn-outline-secondary">📋 Copiar XML</button>
+        <button onclick="baixarXml()" class="btn btn-outline-primary">⬇️ Baixar .xml</button>
+        <a href="{% url 'invoice_detail' invoice.pk %}" class="btn btn-outline-dark">← Voltar</a>
+    </div>
+</div>
+
+{% if erro %}
+<!-- Erro na geração do XML -->
+<div class="card border-danger shadow-sm mb-4">
+    <div class="card-header bg-danger text-white fw-semibold">
+        ❌ Erro ao gerar XML
+    </div>
+    <div class="card-body p-0">
+        <pre class="m-0 p-3 text-danger" style="background:#fff8f8; font-size:0.82rem; overflow-x:auto; white-space:pre-wrap;">{{ erro }}</pre>
+    </div>
+</div>
+{% else %}
+
+<!-- Resumo -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Chave de Acesso</div>
+                <div class="fw-semibold" style="font-size:0.78rem; word-break:break-all;">
+                    {{ invoice.access_key|default:"— (será gerada)" }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Emitente</div>
+                <div class="fw-semibold">{{ invoice.emit_name }}</div>
+                <div class="text-muted small">CNPJ: {{ invoice.emit_cnpj }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Destinatário</div>
+                <div class="fw-semibold">{{ invoice.dest_name|default:"—" }}</div>
+                <div class="text-muted small">
+                    {% if invoice.dest_cnpj %}CNPJ: {{ invoice.dest_cnpj }}
+                    {% elif invoice.dest_cpf %}CPF: {{ invoice.dest_cpf }}{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Total da NF</div>
+                <div class="fw-bold fs-5 text-success">R$ {{ invoice.total_nf|floatformat:2 }}</div>
+                <div class="text-muted small">{{ invoice.items.count }} item(ns)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- XML -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold small">📄 NFeProc / NFe XML — versão 4.00</span>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted small" id="xml-tamanho"></span>
+            <button onclick="toggleWrap()" class="btn btn-sm btn-outline-light py-0 px-2" style="font-size:0.75rem">
+                ↔ Wrap
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0" style="background:#1e1e1e;">
+        <pre id="xml-content"
+             class="m-0 p-4"
+             style="color:#d4d4d4; font-family:'JetBrains Mono','Fira Code','Courier New',monospace;
+                    font-size:0.8rem; overflow-x:auto; white-space:pre; max-height:70vh; overflow-y:auto;">{{ xml_content }}</pre>
+    </div>
+</div>
+
+{% endif %}
+
+<script>
+const xmlRaw = {{ xml_raw|safe }};
+
+document.addEventListener('DOMContentLoaded', function () {
+    const pre = document.getElementById('xml-content');
+    if (pre) {
+        const tamanho = document.getElementById('xml-tamanho');
+        if (tamanho) {
+            const kb = (new Blob([xmlRaw]).size / 1024).toFixed(1);
+            tamanho.textContent = kb + ' KB';
+        }
+        // Syntax highlight básico
+        pre.innerHTML = colorirXml(pre.textContent);
+    }
+});
+
+function colorirXml(xml) {
+    return xml
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/(&lt;\/?)([\w:]+)/g, '$1<span style="color:#569cd6">$2</span>')
+        .replace(/([\w:]+)=(&quot;[^&]*&quot;)/g,
+                 '<span style="color:#9cdcfe">$1</span>=<span style="color:#ce9178">$2</span>')
+        .replace(/(&lt;!--.*?--&gt;)/gs, '<span style="color:#608b4e">$1</span>');
+}
+
+let wrapped = false;
+function toggleWrap() {
+    const pre = document.getElementById('xml-content');
+    wrapped = !wrapped;
+    pre.style.whiteSpace = wrapped ? 'pre-wrap' : 'pre';
+}
+
+function copiarXml() {
+    navigator.clipboard.writeText(xmlRaw).then(() => {
+        const btn = event.target;
+        btn.textContent = '✅ Copiado!';
+        setTimeout(() => btn.textContent = '📋 Copiar XML', 2000);
+    });
+}
+
+function baixarXml() {
+    const blob = new Blob([xmlRaw], {type: 'text/xml'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'NF_{{ invoice.serie }}_{{ invoice.number }}.xml';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}

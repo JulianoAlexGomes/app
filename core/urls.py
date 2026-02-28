@@ -60,6 +60,8 @@ urlpatterns = [
     path('pedidos/<int:order_id>/avancar/',  order_advance_status, name='order_advance_status'),
     path('pedidos/<int:order_id>/cancelar/', order_cancel,         name='order_cancel'),
 
+    path('pedidos/<int:order_id>/gerar-nf/', gerar_nfe, name='gerar_nfe'),
+
     # AJAX
     path('ajax/variants/',        ajax_variants,    name='ajax_variants'),
     path('ajax/fiscal/item/',     ajax_fiscal_item, name='ajax_fiscal_item'),  # 🔥 NOVO
@@ -82,6 +84,7 @@ urlpatterns = [
     path('financeiro/<int:pk>/editar/',         financial_update,  name='financial_update'),
     path('financeiro/<int:pk>/excluir/',        financial_delete,  name='financial_delete'),
     path('financeiro/parcela/<int:pk>/pagar/',  parcel_pay,        name='parcel_pay'),
+    path('financeiro/parcela/<int:pk>/estornar/', parcel_unpay, name='parcel_unpay'),
     path('financeiro/historico/',               financial_history, name='financial_history'),
 
     # Empresa
@@ -114,6 +117,13 @@ urlpatterns = [
     path('fiscal/operacoes/nova/',           FiscalOperationCreateView.as_view(), name='operation_create'),
     path('fiscal/operacoes/<int:pk>/editar/', FiscalOperationUpdateView.as_view(), name='operation_update'),
     path('fiscal/operacoes/<int:pk>/excluir/', FiscalOperationDeleteView.as_view(), name='operation_delete'),
+
+    path('nf/',                     invoice_list,      name='invoice_list'),
+    path('nf/<int:pk>/',            invoice_detail,     name='invoice_detail'),
+    path('nf/<int:pk>/editar/',     invoice_update, name='invoice_update'),
+    path('nf/<int:pk>/transmitir/', invoice_transmit, name='invoice_transmit'),
+    path('nf/<int:pk>/cancelar/',   invoice_cancel,   name='invoice_cancel'),
+    path('nf/<int:pk>/xml-debug/',  invoice_xml_debug, name='invoice_xml_debug'),
 ]
 
 if settings.DEBUG:

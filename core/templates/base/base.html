@@ -6,7 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>
-      {% block title %}Sistema{% endblock %}
+      {% block title %}
+        Sistema
+      {% endblock %}
     </title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -19,14 +21,16 @@
         --sidebar-mini: 72px;
         --transition: 0.3s ease;
       }
-
-      * { box-sizing: border-box; }
-
+      
+      * {
+        box-sizing: border-box;
+      }
+      
       body {
         background: #f4f6f9;
         overflow-x: hidden;
       }
-
+      
       /* ===== OVERLAY (mobile) ===== */
       #sidebarOverlay {
         display: none;
@@ -35,16 +39,16 @@
         background: rgba(0, 0, 0, 0.45);
         z-index: 1039;
       }
-
+      
       #sidebarOverlay.active {
         display: block;
       }
-
+      
       /* ===== LAYOUT ===== */
       .wrapper {
         display: flex;
       }
-
+      
       /* ===== SIDEBAR ===== */
       #sidebar {
         width: var(--sidebar-width);
@@ -61,14 +65,16 @@
         z-index: 1040;
         scrollbar-width: none;
       }
-
-      #sidebar::-webkit-scrollbar { display: none; }
-
+      
+      #sidebar::-webkit-scrollbar {
+        display: none;
+      }
+      
       /* collapsed — desktop */
       #sidebar.sidebar-collapsed {
         width: var(--sidebar-mini);
       }
-
+      
       /* --- collapsed: hide text and chevron, center icons --- */
       #sidebar.sidebar-collapsed .sidebar-text {
         opacity: 0;
@@ -77,55 +83,55 @@
         overflow: hidden;
         pointer-events: none;
       }
-
+      
       /* chevron: hide AND remove from flow so it doesn't affect centering */
       #sidebar.sidebar-collapsed .rotate {
         display: none;
       }
-
+      
       #sidebar.sidebar-collapsed .sidebar-menu a {
         justify-content: center;
         padding-left: 0;
         padding-right: 0;
       }
-
+      
       /* submenus: visually hidden when collapsed (not hovering) */
       #sidebar.sidebar-collapsed:not(:hover) .submenu {
         visibility: hidden;
         height: 0;
         overflow: hidden;
       }
-
+      
       /* hover expands on desktop */
       @media (min-width: 992px) {
         #sidebar.sidebar-collapsed:hover {
           width: var(--sidebar-width);
         }
-
+      
         #sidebar.sidebar-collapsed:hover .sidebar-text {
           opacity: 1;
           width: auto;
           margin-left: 12px;
           pointer-events: auto;
         }
-
+      
         #sidebar.sidebar-collapsed:hover .rotate {
           display: inline-block;
         }
-
+      
         #sidebar.sidebar-collapsed:hover .sidebar-menu a {
           justify-content: flex-start;
           padding-left: 20px;
           padding-right: 20px;
         }
-
+      
         /* restore submenu visibility on hover — JS controls Bootstrap collapse open/close */
         #sidebar.sidebar-collapsed:hover .submenu {
           visibility: visible;
           height: auto;
         }
       }
-
+      
       /* tooltip on collapsed (desktop, no-hover) */
       @media (min-width: 992px) {
         #sidebar.sidebar-collapsed:not(:hover) .sidebar-menu > a[data-title]:hover::after {
@@ -145,7 +151,7 @@
           pointer-events: none;
         }
       }
-
+      
       /* mobile */
       @media (max-width: 991px) {
         #sidebar {
@@ -153,12 +159,12 @@
           transition: transform var(--transition);
           width: var(--sidebar-width) !important;
         }
-
+      
         #sidebar.mobile-open {
           transform: translateX(0);
         }
       }
-
+      
       /* ===== SIDEBAR HEADER ===== */
       .sidebar-header {
         display: flex;
@@ -171,7 +177,7 @@
         min-height: 60px;
         white-space: nowrap;
       }
-
+      
       .toggle-btn {
         background: none;
         border: none;
@@ -183,9 +189,11 @@
         line-height: 1;
         transition: color 0.2s;
       }
-
-      .toggle-btn:hover { color: #fff; }
-
+      
+      .toggle-btn:hover {
+        color: #fff;
+      }
+      
       /* ===== MENU ===== */
       .sidebar-menu a {
         display: flex;
@@ -198,51 +206,56 @@
         transition: background 0.15s, color 0.15s;
         white-space: nowrap;
       }
-
+      
       .sidebar-menu a:hover {
         background: #1f2937;
         color: #fff;
       }
-
+      
       .sidebar-menu a.active {
         background: #2563eb;
         color: #fff;
       }
-
+      
       .sidebar-menu i:first-child {
         font-size: 18px;
         width: 22px;
         text-align: center;
         flex-shrink: 0;
       }
-
+      
       .sidebar-text {
         margin-left: 12px;
         transition: opacity var(--transition), width var(--transition);
         overflow: hidden;
       }
-
+      
       .rotate {
         margin-left: auto;
         font-size: 13px;
         transition: transform 0.25s ease, opacity var(--transition), width var(--transition);
         flex-shrink: 0;
       }
-
+      
       .rotate.open {
         transform: rotate(90deg);
       }
-
+      
       /* ===== SUBMENU ===== */
       .submenu a {
         padding-left: 54px;
         font-size: 13px;
         color: #64748b;
       }
-
-      .submenu a:hover { color: #fff; }
-      .submenu a.active { color: #fff; background: #1d4ed8; }
-
+      
+      .submenu a:hover {
+        color: #fff;
+      }
+      .submenu a.active {
+        color: #fff;
+        background: #1d4ed8;
+      }
+      
       /* ===== MAIN ===== */
       .main {
         flex: 1;
@@ -250,18 +263,18 @@
         transition: margin-left var(--transition);
         min-width: 0;
       }
-
+      
       /* when sidebar is collapsed the main shifts */
       .main.sidebar-collapsed-main {
         margin-left: var(--sidebar-mini);
       }
-
+      
       @media (max-width: 991px) {
         .main {
           margin-left: 0 !important;
         }
       }
-
+      
       .topbar {
         height: 60px;
         background: #fff;
@@ -274,7 +287,7 @@
         top: 0;
         z-index: 100;
       }
-
+      
       .content {
         padding: 28px 30px;
       }
@@ -289,66 +302,85 @@
       <div id="sidebar">
         <div class="sidebar-header">
           <span class="sidebar-text">Sistema</span>
-          <button id="toggle-sidebar" class="toggle-btn" title="Recolher menu">
-            <i class="bi bi-list"></i>
-          </button>
+          <button id="toggle-sidebar" class="toggle-btn" title="Recolher menu"><i class="bi bi-list"></i></button>
         </div>
 
         <div class="sidebar-menu">
-          <a href="{% url 'home' %}" data-title="Dashboard"
-             class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+          <a href="{% url 'home' %}" data-title="Dashboard" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
             <i class="bi bi-speedometer2"></i>
             <span class="sidebar-text">Dashboard</span>
           </a>
 
-          <a href="{% url 'business_update' request.user.business.id %}" data-title="Empresa"
-             class="{% if 'business' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'business_update' request.user.business.id %}" data-title="Empresa" class="{% if 'business' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-building"></i>
             <span class="sidebar-text">Empresa</span>
           </a>
 
-          <a href="{% url 'user_list' %}" data-title="Usuários"
-             class="{% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'user_list' %}" data-title="Usuários" class="{% if 'user' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-person-gear"></i>
             <span class="sidebar-text">Usuários</span>
           </a>
 
-          <a href="{% url 'client_list' %}" data-title="Clientes"
-             class="{% if 'client' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'client_list' %}" data-title="Clientes" class="{% if 'client' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-people"></i>
             <span class="sidebar-text">Clientes</span>
           </a>
 
-          <a href="{% url 'order_list' %}" data-title="Pedidos"
-             class="{% if 'order' in request.resolver_match.url_name %}active{% endif %}">
+          <a href="{% url 'order_list' %}" data-title="Pedidos" class="{% if 'order' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-bag"></i>
             <span class="sidebar-text">Pedidos</span>
           </a>
 
           <!-- ESTOQUE -->
-          <a data-bs-toggle="collapse" href="#estoqueMenu" role="button" data-title="Estoque"
-             class="{% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %}active{% endif %}">
+          <a data-bs-toggle="collapse" href="#estoqueMenu" role="button" data-title="Estoque" class="{% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-box-seam"></i>
             <span class="sidebar-text">Estoque</span>
             <i class="bi bi-chevron-right rotate"></i>
           </a>
-          <div class="collapse submenu {% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %}show{% endif %}"
-               id="estoqueMenu">
+          <div class="collapse submenu {% if 'product' in request.resolver_match.url_name or 'chart' in request.resolver_match.url_name %}show{% endif %}" id="estoqueMenu">
             <a href="{% url 'product_list' %}" class="{% if 'product' in request.resolver_match.url_name %}active{% endif %}">Produtos</a>
             <a href="{% url 'colorchart_list' %}" class="{% if 'colorchart' in request.resolver_match.url_name %}active{% endif %}">Cores</a>
             <a href="{% url 'modelchart_list' %}" class="{% if 'modelchart' in request.resolver_match.url_name %}active{% endif %}">Modelos</a>
             <a href="{% url 'sizechart_list' %}" class="{% if 'sizechart' in request.resolver_match.url_name %}active{% endif %}">Tamanhos</a>
           </div>
 
+          <!-- FINANCEIRO -->
+          <a data-bs-toggle="collapse" href="#financeiroMenu" role="button" data-title="Financeiro" class="{% if request.resolver_match.url_name in 'bank_list paymentmethod_list financial_list' %}active{% endif %}">
+            <i class="bi bi-currency-dollar"></i>
+            <span class="sidebar-text">Financeiro</span>
+            <i class="bi bi-chevron-right rotate"></i>
+          </a>
+
+          <div class="collapse submenu 
+            {% if request.resolver_match.url_name in 'bank_list paymentmethod_list financial_list' %}show{% endif %}" id="financeiroMenu">
+            <a href="{% url 'financial_list' %}" class="{% if request.resolver_match.url_name == 'financial_list' %}active{% endif %}">Lançamentos</a>
+
+            <a href="{% url 'bank_list' %}" class="{% if request.resolver_match.url_name == 'bank_list' %}active{% endif %}">Bancos</a>
+
+            <a href="{% url 'paymentmethod_list' %}" class="{% if request.resolver_match.url_name == 'paymentmethod_list' %}active{% endif %}">Formas de Pagamento</a>
+
+            {% comment %} <a href="{% url 'invoice_list' %}" class="{% if 'invoice' in request.resolver_match.url_name %}active{% endif %}">Notas Fiscais</a> {% endcomment %}
+          </div>
+
+          <!-- NOTAS FISCAIS -->
+          <a data-bs-toggle="collapse" href="#notasfiscaisMenu" role="button" data-title="Notas Fiscais" class="{% if request.resolver_match.url_name in 'invoice_list' %}active{% endif %}">
+            <i class="bi bi-file-earmark-text"></i>
+            <span class="sidebar-text">Notas Fiscais</span>
+            <i class="bi bi-chevron-right rotate"></i>
+          </a>
+            <div class="collapse submenu 
+              {% if request.resolver_match.url_name in 'invoice_list' %}show{% endif %}" id="notasfiscaisMenu">
+                <a href="{% url 'invoice_list' %}" class="{% if 'invoice' in request.resolver_match.url_name %}active{% endif %}">Emitir NFs</a>
+            </div>
+
+
           <!-- FISCAL -->
-          <a data-bs-toggle="collapse" href="#configFiscal" role="button" data-title="Fiscal"
-             class="{% if 'ncm' in request.resolver_match.url_name or 'operation' in request.resolver_match.url_name %}active{% endif %}">
+          <a data-bs-toggle="collapse" href="#configFiscal" role="button" data-title="Fiscal" class="{% if 'ncm' in request.resolver_match.url_name or 'operation' in request.resolver_match.url_name %}active{% endif %}">
             <i class="bi bi-receipt"></i>
             <span class="sidebar-text">Fiscal</span>
             <i class="bi bi-chevron-right rotate"></i>
           </a>
-          <div class="collapse submenu {% if 'ncm' in request.resolver_match.url_name or 'operation' in request.resolver_match.url_name %}show{% endif %}"
-               id="configFiscal">
+          <div class="collapse submenu {% if 'ncm' in request.resolver_match.url_name or 'operation' in request.resolver_match.url_name %}show{% endif %}" id="configFiscal">
             <a href="{% url 'ncm_group_list' %}" class="{% if 'ncm_group' in request.resolver_match.url_name %}active{% endif %}">Grupos NCM</a>
             <a href="{% url 'operation_list' %}" class="{% if 'operation' in request.resolver_match.url_name %}active{% endif %}">Operações Fiscais</a>
           </div>
@@ -369,9 +401,7 @@
         <div class="topbar">
           <div class="d-flex align-items-center gap-3">
             <!-- mobile toggle inside topbar -->
-            <button id="mobile-toggle" class="btn btn-sm btn-light d-lg-none">
-              <i class="bi bi-list fs-5"></i>
-            </button>
+            <button id="mobile-toggle" class="btn btn-sm btn-light d-lg-none"><i class="bi bi-list fs-5"></i></button>
             <strong>{{ request.user.business.name }}</strong>
           </div>
           <span class="text-muted small">{{ request.user.username }}</span>
@@ -387,12 +417,16 @@
             {% endfor %}
           {% endif %}
 
-          {% block content %}{% endblock %}
+          {% block content %}
+
+          {% endblock %}
         </div>
       </div>
     </div>
 
     <script src="{% static 'js/base.js' %}"></script>
-    {% block extra_js %}{% endblock %}
+    {% block extra_js %}
+
+    {% endblock %}
   </body>
 </html>
