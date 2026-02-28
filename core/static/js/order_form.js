@@ -5,20 +5,20 @@ function money(v) {
     return 'R$ ' + (v || 0).toFixed(2).replace('.', ',');
 }
 
-function updatePaymentSummaryFromItems(total) {
-    const totalPedidoEl = document.getElementById('total-pedido');
-    if (!totalPedidoEl) return;
+// function updatePaymentSummaryFromItems(total) {
+//     const totalPedidoEl = document.getElementById('total-pedido');
+//     if (!totalPedidoEl) return;
 
-    totalPedidoEl.dataset.valor = total.toFixed(2);
-    totalPedidoEl.innerText = 'R$ ' + total.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
+//     totalPedidoEl.dataset.valor = total.toFixed(2);
+//     totalPedidoEl.innerText = 'R$ ' + total.toLocaleString('pt-BR', {
+//         minimumFractionDigits: 2,
+//         maximumFractionDigits: 2
+//     });
 
-    if (window.calcularSaldo) {
-        window.calcularSaldo();
-    }
-}
+//     if (window.calcularSaldo) {
+//         window.calcularSaldo();
+//     }
+// }
 
 function recalcTotal() {
     let total = 0;
@@ -32,7 +32,10 @@ function recalcTotal() {
     document.getElementById('total').innerText = money(total);
 
     // 🔥 Atualiza bloco financeiro automaticamente
-    updatePaymentSummaryFromItems(total);
+    // updatePaymentSummaryFromItems(total);
+    if (window.updatePaymentSummaryFromItems) {
+    window.updatePaymentSummaryFromItems(total);
+}
 }
 
 function updateSubtotal(row) {
@@ -90,8 +93,11 @@ function addItemFromForm(variantId, price, qty, discount, addition) {
     const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
     const index           = parseInt(totalFormsInput.value);
 
-    const template = document.getElementById('empty-form-template')
-        .innerHTML.replace(/__prefix__/g, index);
+    // const template = document.getElementById('empty-form-template')
+    //     .innerHTML.replace(/__prefix__/g, index);
+
+    let template = document.getElementById('empty-form-template').innerHTML;
+        template = template.replace(/__prefix__/g, index);
 
     const temp = document.createElement('tbody');
     temp.innerHTML = template;

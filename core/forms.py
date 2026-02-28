@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Client, Sizechart, colorchart, modelchart, Product, StockEntry, Orders, OrderItem, ProductImage, Sizes, ProductVariant, FinancialMovement, FinancialMovementParcel, PaymentMethod, BankAccount, OrderPayment
+from .models import Client, Sizechart, colorchart, modelchart, Product, StockEntry, Orders, OrderItem, ProductImage, Sizes, ProductVariant, FinancialMovement, FinancialMovementParcel, PaymentMethod, BankAccount, OrderPayment, OrderPaymentParcel, Business
 from django.forms import inlineformset_factory
 from django.core.exceptions import ValidationError
 
@@ -537,30 +537,68 @@ class ParcelPayForm(forms.ModelForm):
 class OrderPaymentForm(forms.ModelForm):
     class Meta:
         model = OrderPayment
-        fields = [
-            'payment_method',
-            'bank',
-            'total_value',
-            'parcels',
-            'interval_days',
-        ]
+        fields = ['payment_method', 'bank', 'total_value', 'parcels', 'interval_days']
+        widgets = {
+            'payment_method': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'bank':           forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'total_value':    forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-end payment-total',
+                'step': '0.01',
+            }),
+            'parcels':      forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-center',
+                'min': '1', 'style': 'width:60px',
+            }),
+            'interval_days': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-center',
+                'min': '0', 'style': 'width:70px',
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        business = kwargs.pop('business', None)
+        super().__init__(*args, **kwargs)
+        if business:
+            self.fields['payment_method'].queryset = PaymentMethod.objects.filter(
+                business=business, active=True
+            )
+            self.fields['bank'].queryset = BankAccount.objects.filter(business=business)
+
 
 OrderPaymentFormSet = inlineformset_factory(
     Orders,
     OrderPayment,
     form=OrderPaymentForm,
     extra=0,
-    can_delete=True
+    can_delete=True,
 )
 
+class OrderPaymentParcelForm(forms.ModelForm):
+    class Meta:
+        model = OrderPaymentParcel
+        fields = ['parcel_number', 'value', 'due_date']
+        widgets = {
+            'parcel_number': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-center',
+                'style': 'width:55px',
+            }),
+            'value': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm text-end parcel-value',
+                'step': '0.01',
+            }),
+            'due_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control form-control-sm',
+            }),
+        }
 
-from django import forms
-from .models import Business
-
-
-from django import forms
-from .models import Business
-
+OrderPaymentParcelFormSet = inlineformset_factory(
+    OrderPayment,
+    OrderPaymentParcel,
+    form=OrderPaymentParcelForm,
+    extra=0,
+    can_delete=True,
+)
 
 class BusinessForm(forms.ModelForm):
 

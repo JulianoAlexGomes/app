@@ -7,7 +7,7 @@ from .forms import (
     ClientForm, SizechartForm, SizesFormSet, colorchartForm, modelchartForm,
     ProductForm, StockEntryForm, OrderForm, OrderItemFormSet, ProductImageFormSet,
     PaymentMethodForm, BankAccountForm, FinancialMovementForm, FinancialParcelFormSet,
-    ParcelPayForm, OrderPaymentFormSet, FiscalOperationForm, InvoiceForm, InvoiceItemFormSet, InvoicePaymentFormSet
+    ParcelPayForm, OrderPaymentFormSet, FiscalOperationForm, OrderPaymentParcelFormSet
 )
 from django.shortcuts import redirect, get_object_or_404
 from django.core.paginator import Paginator
@@ -591,31 +591,41 @@ def order_list(request):
         'current_status': status,
     })
 
-
 @login_required
 @transaction.atomic
 def order_update(request, pk):
-    order = get_object_or_404(Orders, pk=pk, business=request.user.business)
+    order    = get_object_or_404(Orders, pk=pk, business=request.user.business)
+    business = request.user.business
 
     if request.method == 'POST' and not order.can_edit():
         messages.error(request, 'Este pedido não pode mais ser alterado.')
         return redirect('order_list')
 
     if request.method == 'POST':
-        form             = OrderForm(request.POST, instance=order, user=request.user)
-        formset          = OrderItemFormSet(request.POST, instance=order, prefix='items')
-        payment_formset  = OrderPaymentFormSet(request.POST, instance=order, prefix='payments')
+        form            = OrderForm(request.POST, instance=order, user=request.user)
+        formset         = OrderItemFormSet(request.POST, instance=order, prefix='items')
+        payment_formset = OrderPaymentFormSet(request.POST, instance=order, prefix='payments')
 
-        if form.is_valid() and formset.is_valid() and payment_formset.is_valid():
+        # Coleta formsets de parcelas para cada payment (pelo índice do form)
+        parcel_formsets = {}
+        for i, pf in enumerate(payment_formset.forms):
+            prefix = f'parcels-{i}'
+            parcel_formsets[i] = OrderPaymentParcelFormSet(
+                request.POST,
+                instance=pf.instance if pf.instance.pk else None,
+                prefix=prefix,
+            )
+
+        payments_valid = payment_formset.is_valid()
+        parcels_valid  = all(pfs.is_valid() for pfs in parcel_formsets.values())
+
+        if form.is_valid() and formset.is_valid() and payments_valid and parcels_valid:
 
             form.save()
             total = Decimal('0.00')
 
-            # ─────────────────────────────────────────────
-            # ITENS + REGRA FISCAL
-            # ─────────────────────────────────────────────
+            # ── ITENS ──────────────────────────────────────────────────
             for form_item in formset:
-
                 if form_item.cleaned_data.get('DELETE'):
                     if form_item.instance.pk:
                         form_item.instance.delete()
@@ -624,14 +634,12 @@ def order_update(request, pk):
                 item       = form_item.save(commit=False)
                 item.order = order
 
-                # 🔥 Aplica regra fiscal antes de salvar
                 try:
                     found = apply_fiscal_rules(item, raise_on_missing=False)
                     if not found:
                         messages.warning(
                             request,
-                            f'Item "{item.variant.product.name}": nenhuma operação fiscal '
-                            f'encontrada. Verifique o NCM e as operações fiscais cadastradas.'
+                            f'Item "{item.variant.product.name}": nenhuma operação fiscal encontrada.'
                         )
                 except Exception as e:
                     messages.error(request, f'Erro ao aplicar regra fiscal: {e}')
@@ -642,56 +650,103 @@ def order_update(request, pk):
             order.total_amount = total
             order.save(update_fields=['total_amount'])
 
-            # ─────────────────────────────────────────────
-            # PAGAMENTOS
-            # ─────────────────────────────────────────────
-            for payment_form in payment_formset:
+            # ── VALIDAÇÃO: soma pagamentos == total ────────────────────
+            # ── PAGAMENTOS + PARCELAS ──────────────────────────────
 
-                if payment_form.cleaned_data.get('DELETE'):
-                    if payment_form.instance.pk:
-                        payment_form.instance.delete()
+            # 1) Salva o formset para popular deleted_objects
+            payment_formset.save(commit=False)  # popula .deleted_objects sem salvar no DB
+
+            # 2) Deleta payments marcados para exclusão
+            for obj in payment_formset.deleted_objects:
+                obj.delete()
+
+            # 3) Salva / atualiza cada payment e suas parcelas
+            for form_idx, pf in enumerate(payment_formset.forms):
+                if not pf.cleaned_data:
                     continue
 
-                payment       = payment_form.save(commit=False)
+                if pf.cleaned_data.get('DELETE'):
+                    if pf.instance.pk:
+                        pf.instance.delete()
+                    continue
+
+                payment       = pf.save(commit=False)
                 payment.order = order
                 payment.save()
 
-                payment.parcels_records.all().delete()
-                payment.generate_parcels()
+                # Parcelas deste payment
+                pf_set          = parcel_formsets[form_idx]
+                pf_set.instance = payment
 
-            messages.success(request, 'Pedido salvo com sucesso.')
-            return redirect('order_update', pk=order.pk)
+                # Popula deleted_objects das parcelas
+                pf_set.save(commit=False)
+
+                # Deleta parcelas marcadas para exclusão
+                for obj in pf_set.deleted_objects:
+                    obj.delete()
+
+                # Salva parcelas novas/alteradas
+                parcels = pf_set.save(commit=False)
+                for parcel in parcels:
+                    parcel.payment = payment
+                    parcel.save()
+
+                # Só gera automaticamente se não há nenhuma parcela ativa enviada
+                active_parcel_rows = [
+                    f for f in pf_set.forms
+                    if f.cleaned_data and not f.cleaned_data.get('DELETE')
+                ]
+                if not active_parcel_rows:
+                    payment.generate_parcels()
 
     else:
         form            = OrderForm(instance=order, user=request.user)
         formset         = OrderItemFormSet(instance=order, prefix='items')
         payment_formset = OrderPaymentFormSet(instance=order, prefix='payments')
 
+    # Monta parcelas por pagamento para o template
+    payments_with_parcel_forms = []
+    for i, pf in enumerate(payment_formset.forms):
+        prefix = f'parcels-{i}'
+        if pf.instance.pk:
+            pf_set = OrderPaymentParcelFormSet(instance=pf.instance, prefix=prefix)
+        else:
+            pf_set = OrderPaymentParcelFormSet(prefix=prefix)
+        payments_with_parcel_forms.append((pf, pf_set))
+
     total_order    = order.total_amount or Decimal('0.00')
     total_payments = order.payments.aggregate(total=Sum('total_value'))['total'] or Decimal('0.00')
     saldo          = total_order - total_payments
 
     invoice_ativa = Invoice.objects.filter(
-       order=order,
-       status__in=[
-           InvoiceStatus.RASCUNHO,
-           InvoiceStatus.PENDENTE,
-           InvoiceStatus.AUTORIZADA,
-       ]
-   ).first()
+        order=order,
+        status__in=[InvoiceStatus.RASCUNHO, InvoiceStatus.PENDENTE, InvoiceStatus.AUTORIZADA],
+    ).first()
+
+    # Config de formas de pagamento para o JS
+    import json
+    payment_methods_json = json.dumps([
+        {
+            'id':              pm.pk,
+            'default_parcels': pm.default_parcels,
+            'interval_days':   pm.interval_days,
+            'default_bank':    pm.default_bank_id or '',
+        }
+        for pm in PaymentMethod.objects.filter(business=business, active=True)
+    ])
 
     return render(request, 'orders/form_update.html', {
-        'form': form,
-        'formset': formset,
-        'payment_formset': payment_formset,
-        'order': order,
-        'total_order': total_order,
-        'total_payments': total_payments,
-        'saldo': saldo,
-        'payments_with_parcels': order.payments.prefetch_related('parcels_records'),
-        'invoice_ativa': invoice_ativa,
+        'form':                       form,
+        'formset':                    formset,
+        'payment_formset':            payment_formset,
+        'payments_with_parcel_forms': payments_with_parcel_forms,
+        'order':                      order,
+        'total_order':                total_order,
+        'total_payments':             total_payments,
+        'saldo':                      saldo,
+        'invoice_ativa':              invoice_ativa,
+        'payment_methods_json':       payment_methods_json,
     })
-
 
 @login_required
 def order_delete(request, pk):
@@ -1058,19 +1113,56 @@ def financial_create(request):
         form    = FinancialMovementForm(request.POST)
         formset = FinancialParcelFormSet(request.POST, prefix='parcels')
 
+        form.fields['client'].queryset         = Client.objects.filter(business=business)
+        form.fields['payment_method'].queryset = PaymentMethod.objects.filter(business=business)
+        form.fields['bank'].queryset           = BankAccount.objects.filter(business=business)
+
         if form.is_valid() and formset.is_valid():
-            movement          = form.save(commit=False)
-            movement.business = business
-            movement.save()
-            formset.instance = movement
-            formset.save()
-            messages.success(request, 'Lançamento criado com sucesso.')
-            return redirect('financial_list')
+            # ── Valida soma das parcelas == total_value ───────────────────
+            total_value  = form.cleaned_data['total_value']
+            total_parcel = sum(
+                f.cleaned_data.get('value') or 0
+                for f in formset
+                if f.cleaned_data and not f.cleaned_data.get('DELETE')
+            )
+            if total_parcel != total_value:
+                form.add_error(
+                    'total_value',
+                    f'A soma das parcelas (R$ {total_parcel:.2f}) deve ser igual ao valor total (R$ {total_value:.2f}).'
+                )
+            else:
+                movement          = form.save(commit=False)
+                movement.business = business
+                movement.save()
+                formset.instance = movement
+                formset.save()
+                messages.success(request, '✅ Lançamento criado com sucesso.')
+                return redirect('financial_list')
     else:
         form    = FinancialMovementForm()
-        formset = FinancialParcelFormSet()
+        formset = FinancialParcelFormSet(prefix='parcels')
+        form.fields['client'].queryset         = Client.objects.filter(business=business)
+        form.fields['payment_method'].queryset = PaymentMethod.objects.filter(business=business)
+        form.fields['bank'].queryset           = BankAccount.objects.filter(business=business)
 
-    return render(request, 'financial/form.html', {'form': form, 'formset': formset, 'title': 'Novo Lançamento'})
+    # Serializa formas de pagamento para o JS auto-preencher parcelas
+    import json
+    payment_methods_json = json.dumps([
+        {
+            'id':             pm.pk,
+            'default_parcels': pm.default_parcels,
+            'interval_days':  pm.interval_days,
+            'default_bank':   pm.default_bank_id or '',
+        }
+        for pm in PaymentMethod.objects.filter(business=business)
+    ])
+
+    return render(request, 'financial/form.html', {
+        'form':                 form,
+        'formset':              formset,
+        'title':                'Novo Lançamento',
+        'payment_methods_json': payment_methods_json,
+    })
 
 
 @login_required
@@ -1085,19 +1177,53 @@ def financial_update(request, pk):
 
     if request.method == 'POST':
         form    = FinancialMovementForm(request.POST, instance=movement)
-        formset = FinancialParcelFormSet(request.POST, instance=movement)
+        formset = FinancialParcelFormSet(request.POST, instance=movement, prefix='parcels')
+
+        form.fields['client'].queryset         = Client.objects.filter(business=business)
+        form.fields['payment_method'].queryset = PaymentMethod.objects.filter(business=business)
+        form.fields['bank'].queryset           = BankAccount.objects.filter(business=business)
 
         if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
-            messages.success(request, 'Lançamento atualizado com sucesso.')
-            return redirect('financial_list')
+            total_value  = form.cleaned_data['total_value']
+            total_parcel = sum(
+                f.cleaned_data.get('value') or 0
+                for f in formset
+                if f.cleaned_data and not f.cleaned_data.get('DELETE')
+            )
+            if total_parcel != total_value:
+                form.add_error(
+                    'total_value',
+                    f'A soma das parcelas (R$ {total_parcel:.2f}) deve ser igual ao valor total (R$ {total_value:.2f}).'
+                )
+            else:
+                form.save()
+                formset.save()
+                messages.success(request, '✅ Lançamento atualizado com sucesso.')
+                return redirect('financial_list')
     else:
         form    = FinancialMovementForm(instance=movement)
-        formset = FinancialParcelFormSet(instance=movement)
+        formset = FinancialParcelFormSet(instance=movement, prefix='parcels')
+        form.fields['client'].queryset         = Client.objects.filter(business=business)
+        form.fields['payment_method'].queryset = PaymentMethod.objects.filter(business=business)
+        form.fields['bank'].queryset           = BankAccount.objects.filter(business=business)
+
+    import json
+    payment_methods_json = json.dumps([
+        {
+            'id':              pm.pk,
+            'default_parcels': pm.default_parcels,
+            'interval_days':   pm.interval_days,
+            'default_bank':    pm.default_bank_id or '',
+        }
+        for pm in PaymentMethod.objects.filter(business=business)
+    ])
 
     return render(request, 'financial/form.html', {
-        'form': form, 'formset': formset, 'movement': movement, 'title': 'Editar Lançamento'
+        'form':                 form,
+        'formset':              formset,
+        'movement':             movement,
+        'title':                'Editar Lançamento',
+        'payment_methods_json': payment_methods_json,
     })
 
 
@@ -1112,10 +1238,26 @@ def financial_delete(request, pk):
 
     if request.method == 'POST':
         movement.delete()
-        messages.success(request, 'Lançamento excluído com sucesso.')
+        messages.success(request, '✅ Lançamento excluído com sucesso.')
         return redirect('financial_list')
 
     return render(request, 'financial/delete.html', {'movement': movement})
+
+
+# ─── AJAX — retorna config da forma de pagamento ─────────────────────────────
+@login_required
+def ajax_payment_method_config(request):
+    from django.http import JsonResponse
+    pk = request.GET.get('pk')
+    try:
+        pm = PaymentMethod.objects.get(pk=pk, business=request.user.business)
+        return JsonResponse({
+            'default_parcels': pm.default_parcels,
+            'interval_days':   pm.interval_days,
+            'default_bank':    pm.default_bank_id or '',
+        })
+    except PaymentMethod.DoesNotExist:
+        return JsonResponse({}, status=404)
 
 @login_required
 def parcel_pay(request, pk):

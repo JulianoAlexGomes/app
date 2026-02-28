@@ -5,15 +5,55 @@
 
 {% block content %}
 
-<!-- SELECT2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+.order-locked input,
+.order-locked select,
+.order-locked textarea,
+.order-locked button { pointer-events: none; opacity: 0.6; }
+.order-locked input,
+.order-locked select,
+.order-locked textarea { background-color: #f8f9fa !important; }
+
+.select2-container .select2-selection--single          { height: 38px; padding: 4px 8px; }
+.select2-container--default .select2-selection--single { border: 1px solid #ced4da; border-radius: .375rem; }
+.select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 28px; }
+
+.payment-block {
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+.payment-block-header {
+    background: #f8f9fa;
+    padding: .6rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #dee2e6;
+}
+.payment-block-parcels { padding: .5rem 1rem 1rem; }
+.parcels-table thead th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    background: #f8f9fa;
+}
+#pay-saldo-bar {
+    height: 6px;
+    border-radius: 3px;
+    transition: width .3s, background .3s;
+}
+</style>
 
 <!-- ===== CABEÇALHO ===== -->
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
     <div class="d-flex align-items-center gap-3">
         <h2 class="mb-0">Pedido #{{ order.id }}</h2>
 
-        <!-- Badge NF-e / NFC-e -->
         {% if order.document_model == '55' %}
             <span class="badge bg-primary fs-6 px-3 py-2">🧾 NF-e</span>
         {% elif order.document_model == '65' %}
@@ -22,58 +62,43 @@
             <span class="badge bg-secondary fs-6 px-3 py-2">Sem modelo definido</span>
         {% endif %}
 
-        <!-- Badge Status -->
-        <span class="badge
+        <span class="badge fs-6 px-3 py-2
             {% if order.status == 'DIGITACAO' %}bg-secondary
             {% elif order.status == 'ORCAMENTO' %}bg-info text-dark
             {% elif order.status == 'EM_SEPARACAO' %}bg-warning text-dark
             {% elif order.status == 'SEPARADO' %}bg-primary
             {% elif order.status == 'FATURADO' %}bg-success
             {% elif order.status == 'CANCELADO' %}bg-danger
-            {% endif %} fs-6 px-3 py-2">
+            {% endif %}">
             {{ order.get_status_display }}
         </span>
     </div>
 
     <div class="d-flex gap-2">
-
-        <!-- ===== BOTÃO GERAR NF — só aparece quando FATURADO e sem NF ativa ===== -->
         {% if order.status == 'FATURADO' %}
-            {% with nf_ativa=order.invoices.filter %}
-                {% if not invoice_ativa %}
-                    <button type="button"
-                            class="btn btn-success fw-semibold px-4"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modalGerarNF">
-                        🧾 Gerar
-                        {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}NF{% endif %}
-                    </button>
-                {% else %}
-                    <!-- NF já existe — link para visualizar -->
-                    <a href="{% url 'invoice_detail' invoice_ativa.pk %}"
-                       class="btn btn-outline-success fw-semibold px-4">
-                        🧾 Ver
-                        {% if order.document_model == '55' %}NF-e{% else %}NFC-e{% endif %}
-                        {{ invoice_ativa.serie }}/{{ invoice_ativa.number }}
-                    </a>
-                {% endif %}
-            {% endwith %}
+            {% if not invoice_ativa %}
+                <button type="button" class="btn btn-success fw-semibold px-4"
+                        data-bs-toggle="modal" data-bs-target="#modalGerarNF">
+                    🧾 Gerar {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}NF{% endif %}
+                </button>
+            {% else %}
+                <a href="{% url 'invoice_detail' invoice_ativa.pk %}"
+                   class="btn btn-outline-success fw-semibold px-4">
+                    🧾 Ver {% if order.document_model == '55' %}NF-e{% else %}NFC-e{% endif %}
+                    {{ invoice_ativa.serie }}/{{ invoice_ativa.number }}
+                </a>
+            {% endif %}
         {% endif %}
-
         <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">← Voltar</a>
     </div>
 </div>
 
 {% if order.status not in 'DIGITACAO,ORCAMENTO' %}
 <div class="alert alert-warning border-warning d-flex align-items-start gap-2">
-    <div style="font-size: 1.5rem;">⚠️</div>
+    <div style="font-size:1.5rem;">⚠️</div>
     <div>
         <h6 class="mb-1 fw-bold">Pedido bloqueado para edição</h6>
-        <p class="mb-0">
-            Este pedido encontra-se em status
-            <strong>{{ order.get_status_display }}</strong>
-            e não pode mais ser alterado.
-        </p>
+        <p class="mb-0">Este pedido encontra-se em status <strong>{{ order.get_status_display }}</strong> e não pode mais ser alterado.</p>
     </div>
 </div>
 {% endif %}
@@ -81,6 +106,10 @@
 <form method="post"
       class="{% if order.status != order.STATUS_DIGITACAO and order.status != order.STATUS_ORCAMENTO %}order-locked{% endif %}">
     {% csrf_token %}
+
+    {% comment %} {{-- management forms -- apenas uma vez cada --}} {% endcomment %}
+    {{ formset.management_form }}
+    {{ payment_formset.management_form }}
 
     <!-- ===== CLIENTE ===== -->
     <div class="card shadow-sm p-3 mb-4 border-0">
@@ -96,18 +125,12 @@
     <!-- ===== ADICIONAR ITEM ===== -->
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0 fw-semibold">Adicionar Item</h5>
-            </div>
-
+            <h5 class="mb-3 fw-semibold">Adicionar Item</h5>
             <div class="row g-3 align-items-end">
-
                 <div class="col-lg-5 col-md-12">
                     <label class="form-label fw-semibold">Produto / Tamanho</label>
                     <select id="product" class="form-control w-100"></select>
                 </div>
-
                 <div class="col-lg-2 col-md-4">
                     <label class="form-label fw-semibold">Tipo</label>
                     <select id="price_type" class="form-select">
@@ -115,28 +138,23 @@
                         <option value="price1">Atacado</option>
                     </select>
                 </div>
-
                 <div class="col-lg-1 col-md-2">
                     <label class="form-label fw-semibold">Qtd</label>
                     <input id="quantity" type="number" min="1" class="form-control text-center" value="1">
                 </div>
-
                 <div class="col-lg-2 col-md-3">
                     <label class="form-label fw-semibold">Preço</label>
                     <input id="price" type="number" step="0.01" class="form-control text-end">
                 </div>
-
                 <div class="col-lg-1 col-md-3">
                     <label class="form-label fw-semibold">Desc.</label>
                     <input id="discount" type="number" step="0.01" class="form-control text-end" value="0">
                 </div>
-
                 <div class="col-lg-1 col-md-3">
                     <label class="form-label fw-semibold">Acrés.</label>
                     <input id="addition" type="number" step="0.01" class="form-control text-end" value="0">
                 </div>
 
-                <!-- Preview fiscal -->
                 <div class="col-12" id="fiscal-preview" style="display:none">
                     <div class="alert alert-light border small py-2 mb-0">
                         <div class="row g-2 align-items-center">
@@ -150,20 +168,16 @@
                         </div>
                     </div>
                 </div>
-
                 <div id="fiscal-warning" class="col-12" style="display:none">
                     <div class="alert alert-warning small py-2 mb-0">
-                        ⚠️ Nenhuma operação fiscal encontrada para este produto.
-                        Verifique o NCM e as operações fiscais cadastradas.
+                        ⚠️ Nenhuma operação fiscal encontrada. Verifique o NCM e as operações fiscais cadastradas.
                     </div>
                 </div>
-
                 <div class="col-12 mt-3">
                     <button type="button" id="add-item-btn" class="btn btn-success w-100 fw-semibold py-2">
                         ➕ Adicionar ao Pedido
                     </button>
                 </div>
-
             </div>
         </div>
     </div>
@@ -171,10 +185,6 @@
     <!-- ===== ITENS DO PEDIDO ===== -->
     <div class="card shadow-sm p-3 mb-4 border-0">
         <h5 class="mb-3">Itens do Pedido</h5>
-
-        {{ formset.management_form }}
-        {{ payment_formset.management_form }}
-
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead class="table-light">
@@ -191,21 +201,21 @@
                     </tr>
                 </thead>
                 <tbody id="items-table">
-                    {% for form in formset %}
+                    {% for iform in formset %}
                     <tr class="item-form">
-                        <td>{{ form.variant }}</td>
-                        <td>{{ form.quantity }}</td>
-                        <td>{{ form.price }}</td>
-                        <td>{{ form.discount }}</td>
-                        <td>{{ form.addition }}</td>
-                        <td class="text-center text-muted small">{{ form.instance.cfop|default:"—" }}</td>
+                        <td>{{ iform.variant }}</td>
+                        <td>{{ iform.quantity }}</td>
+                        <td>{{ iform.price }}</td>
+                        <td>{{ iform.discount }}</td>
+                        <td>{{ iform.addition }}</td>
+                        <td class="text-center text-muted small">{{ iform.instance.cfop|default:"—" }}</td>
                         <td class="text-center text-muted small">
-                            {% if form.instance.icms_rate %}{{ form.instance.icms_rate }}%{% else %}—{% endif %}
+                            {% if iform.instance.icms_rate %}{{ iform.instance.icms_rate }}%{% else %}—{% endif %}
                         </td>
                         <td class="subtotal text-end fw-semibold">R$ 0,00</td>
                         <td class="text-center">
-                            {{ form.id }}
-                            {{ form.DELETE }}
+                            {{ iform.id }}
+                            {{ iform.DELETE }}
                             <button type="button" class="btn btn-outline-danger btn-sm remove-item">✕</button>
                         </td>
                     </tr>
@@ -213,217 +223,194 @@
                 </tbody>
             </table>
         </div>
-
         <div class="d-flex justify-content-end mt-3">
             <h4>Total: <span id="total" class="fw-bold text-success">R$ 0,00</span></h4>
         </div>
     </div>
 
     <!-- ===== FORMAS DE PAGAMENTO ===== -->
-    <div class="card mt-4">
-        <div class="card-header bg-light d-flex justify-content-between flex-wrap gap-2">
-            <strong>Formas de Pagamento</strong>
-            <div>
-                Total: <strong id="total-pedido" data-valor="{{ total_order|floatformat:2 }}">R$ {{ total_order|floatformat:2 }}</strong>
-                <span class="ms-3">Pago: <strong id="total-pagamentos">R$ {{ total_payments|floatformat:2 }}</strong></span>
-                <span class="ms-3">
-                    Saldo: <strong id="saldo-pedido" class="{% if saldo > 0 %}text-danger{% else %}text-success{% endif %}">
-                        R$ {{ saldo|floatformat:2 }}
-                    </strong>
-                </span>
-            </div>
-        </div>
-        <div class="card-body">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Forma</th>
-                        <th>Banco</th>
-                        <th width="120">Valor</th>
-                        <th width="100">Parcelas</th>
-                        <th width="120">Intervalo</th>
-                        <th width="60"></th>
-                    </tr>
-                </thead>
-                <tbody id="payments-table">
-                    {% for form in payment_formset %}
-                    <tr class="payment-row">
-                        <td>{{ form.id }}{{ form.payment_method }}</td>
-                        <td>{{ form.bank }}</td>
-                        <td>{{ form.total_value }}</td>
-                        <td>{{ form.parcels }}</td>
-                        <td>{{ form.interval_days }}</td>
-                        <td>
-                            {{ form.DELETE }}
-                            <button type="button" class="btn btn-sm btn-danger remove-payment">✕</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <button type="button" id="add-payment" class="btn btn-success mt-2">➕ Adicionar Pagamento</button>
-
-            <div id="msg-pago"    class="alert alert-success mt-3 d-none">✔ Pagamento Efetuado</div>
-            <div id="msg-parcial" class="alert alert-warning mt-3 d-none">⚠ Pagamento Pendente</div>
-        </div>
-    </div>
-
-    <!-- ===== PARCELAS GERADAS ===== -->
-    {% if order.payments.exists %}
-    <div class="card mt-4 border-success">
-        <div class="card-header bg-success text-white">
-            <strong>Parcelas Geradas</strong>
-        </div>
-        <div class="card-body">
-            {% for payment in order.payments.all %}
-                {% if payment.parcels_records.exists %}
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-header bg-light d-flex justify-content-between">
-                        <div>
-                            <strong>{{ payment.payment_method }}</strong>
-                            {% if payment.bank %} - {{ payment.bank }}{% endif %}
-                        </div>
-                        <div>Total: <strong>R$ {{ payment.total_value|floatformat:2 }}</strong> | {{ payment.parcels }}x</div>
+    <div class="card shadow-sm border-0 mt-4">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <strong>💳 Formas de Pagamento</strong>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="d-flex flex-column" style="min-width:210px">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Pago</span>
+                        <span id="lbl-pay-total" class="fw-semibold">R$ 0,00</span>
+                        <span class="text-muted">/ <span id="lbl-pay-pedido">R$ {{ total_order|floatformat:2 }}</span></span>
                     </div>
-                    <div class="card-body p-2">
-                        <table class="table table-sm table-striped table-bordered mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th width="60">#</th>
-                                    <th>Vencimento</th>
-                                    <th>Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for parcel in payment.parcels_records.all %}
-                                <tr>
-                                    <td>{{ parcel.parcel_number }}</td>
-                                    <td>{{ parcel.due_date|date:"d/m/Y" }}</td>
-                                    <td>R$ {{ parcel.value|floatformat:2 }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="bg-white rounded border" style="height:6px; overflow:hidden">
+                        <div id="pay-saldo-bar" style="width:0%; height:100%; background:#fbbf24;"></div>
                     </div>
                 </div>
-                {% endif %}
-            {% empty %}
-                <div class="alert alert-warning mb-0">Nenhuma parcela gerada ainda.</div>
+                <span class="fw-semibold small">
+                    Saldo: <span id="lbl-pay-saldo"
+                        class="fw-bold {% if saldo > 0 %}text-danger{% else %}text-success{% endif %}">
+                        R$ {{ saldo|floatformat:2 }}
+                    </span>
+                </span>
+                <button type="button" class="btn btn-success btn-sm px-3" id="add-payment">
+                    ➕ Pagamento
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body p-3">
+            <div id="payments-container">
+            {% for payment_form, parcel_formset in payments_with_parcel_forms %}
+            <div class="payment-block" data-payment-index="{{ forloop.counter0 }}">
+
+                <div class="payment-block-header">
+                    {{ payment_form.id }}
+                    <div style="min-width:160px">
+                        <div class="small text-muted mb-1">Forma de Pagamento</div>
+                        {{ payment_form.payment_method }}
+                    </div>
+                    <div style="min-width:160px">
+                        <div class="small text-muted mb-1">Banco</div>
+                        {{ payment_form.bank }}
+                    </div>
+                    <div style="width:120px">
+                        <div class="small text-muted mb-1">Valor Total</div>
+                        {{ payment_form.total_value }}
+                    </div>
+                    <div style="width:75px">
+                        <div class="small text-muted mb-1">Parcelas</div>
+                        {{ payment_form.parcels }}
+                    </div>
+                    <div style="width:90px">
+                        <div class="small text-muted mb-1">Intervalo (dias)</div>
+                        {{ payment_form.interval_days }}
+                    </div>
+                    <div class="ms-auto d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-primary btn-sm btn-gerar-parcelas"
+                                data-idx="{{ forloop.counter0 }}">⚡ Gerar</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-payment">✕</button>
+                        {{ payment_form.DELETE }}
+                    </div>
+                </div>
+
+                <div class="payment-block-parcels">
+                    {{ parcel_formset.management_form }}
+                    <table class="table parcels-table align-middle mb-2" style="font-size:.875rem">
+                        <thead>
+                            <tr>
+                                <th style="width:55px">#</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th style="width:50px" class="text-center">Del</th>
+                            </tr>
+                        </thead>
+                        <tbody class="parcel-rows">
+                            {% for pf in parcel_formset %}
+                            <tr class="parcel-row">
+                                <td>{{ pf.parcel_number }}</td>
+                                <td>{{ pf.value }}</td>
+                                <td>{{ pf.due_date }}</td>
+                                <td class="text-center">
+                                    {{ pf.id }}
+                                    {% if pf.instance.pk %}
+                                        {{ pf.DELETE }}
+                                        <label class="btn btn-outline-danger btn-sm px-2 del-parcel-label">✕</label>
+                                    {% else %}
+                                        <button type="button" class="btn btn-outline-danger btn-sm px-2 remove-parcel-row">✕</button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-add-parcel-row"
+                            data-idx="{{ forloop.counter0 }}">+ Linha</button>
+                    <div class="parcel-sum-feedback mt-2 small">
+                        Soma: <strong class="parcel-sum-value">R$ 0,00</strong>
+                    </div>
+                </div>
+
+            </div>
             {% endfor %}
+            </div>
+
+            <div id="msg-pago"    class="alert alert-success mt-3 d-none small">✔ Pagamento completo</div>
+            <div id="msg-parcial" class="alert alert-warning  mt-3 d-none small">⚠ Saldo pendente</div>
         </div>
     </div>
-    {% endif %}
 
     <!-- ===== SALVAR ===== -->
-    <div class="d-flex justify-content-end mt-4">
-        <button class="btn btn-primary btn-lg px-5">💾 Salvar Pedido</button>
+    <div class="d-flex justify-content-end mt-4 mb-5">
+        <button type="submit" class="btn btn-primary btn-lg px-5">💾 Salvar Pedido</button>
     </div>
 
 </form>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     MODAL — GERAR NF-e / NFC-e
-════════════════════════════════════════════════════════════════ -->
+<!-- ===== MODAL GERAR NF ===== -->
 {% if order.status == 'FATURADO' and not invoice_ativa %}
-<div class="modal fade" id="modalGerarNF" tabindex="-1" aria-labelledby="modalGerarNFLabel" aria-hidden="true">
+<div class="modal fade" id="modalGerarNF" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
-
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold" id="modalGerarNFLabel">
+                <h5 class="modal-title fw-bold">
                     🧾 Confirmar Geração de
                     {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}Nota Fiscal{% endif %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-
             <div class="modal-body pt-3">
-
-                <!-- Resumo do pedido -->
                 <div class="rounded-3 p-3 mb-3" style="background:#f8f9fa;">
                     <div class="row g-2 small">
-                        <div class="col-6">
-                            <span class="text-muted">Pedido</span><br>
-                            <strong>#{{ order.id }}</strong>
+                        <div class="col-6"><span class="text-muted">Pedido</span><br><strong>#{{ order.id }}</strong></div>
+                        <div class="col-6"><span class="text-muted">Modelo</span><br>
+                            <strong>{% if order.document_model == '55' %}NF-e (55){% elif order.document_model == '65' %}NFC-e (65){% else %}—{% endif %}</strong>
                         </div>
-                        <div class="col-6">
-                            <span class="text-muted">Modelo</span><br>
-                            <strong>
-                                {% if order.document_model == '55' %}NF-e (55){% elif order.document_model == '65' %}NFC-e (65){% else %}—{% endif %}
-                            </strong>
-                        </div>
-                        <div class="col-6">
-                            <span class="text-muted">Cliente</span><br>
+                        <div class="col-6"><span class="text-muted">Cliente</span><br>
                             <strong>{{ order.client.name|default:"Consumidor Final" }}</strong>
                         </div>
-                        <div class="col-6">
-                            <span class="text-muted">Total</span><br>
+                        <div class="col-6"><span class="text-muted">Total</span><br>
                             <strong class="text-success">R$ {{ order.total_amount|floatformat:2 }}</strong>
                         </div>
-                        <div class="col-6">
-                            <span class="text-muted">Série</span><br>
-                            <strong>
-                                {% if order.document_model == '55' %}{{ order.business.nfe_series }}{% else %}{{ order.business.nfce_series }}{% endif %}
-                            </strong>
+                        <div class="col-6"><span class="text-muted">Série</span><br>
+                            <strong>{% if order.document_model == '55' %}{{ order.business.nfe_series }}{% else %}{{ order.business.nfce_series }}{% endif %}</strong>
                         </div>
-                        <div class="col-6">
-                            <span class="text-muted">Próximo número</span><br>
-                            <strong>
-                                {% if order.document_model == '55' %}{{ order.business.nfe_last_number|add:1 }}{% else %}{{ order.business.nfce_last_number|add:1 }}{% endif %}
-                            </strong>
+                        <div class="col-6"><span class="text-muted">Próximo número</span><br>
+                            <strong>{% if order.document_model == '55' %}{{ order.business.nfe_last_number|add:1 }}{% else %}{{ order.business.nfce_last_number|add:1 }}{% endif %}</strong>
                         </div>
-                        <div class="col-6">
-                            <span class="text-muted">Ambiente</span><br>
+                        <div class="col-6"><span class="text-muted">Ambiente</span><br>
                             {% if order.business.nfe_environment == 2 %}
                                 <span class="badge bg-warning text-dark">Homologação</span>
                             {% else %}
                                 <span class="badge bg-success">Produção</span>
                             {% endif %}
                         </div>
-                        <div class="col-6">
-                            <span class="text-muted">Itens</span><br>
+                        <div class="col-6"><span class="text-muted">Itens</span><br>
                             <strong>{{ order.items.count }} produto{{ order.items.count|pluralize }}</strong>
                         </div>
                     </div>
                 </div>
-
-                <!-- Aviso homologação -->
                 {% if order.business.nfe_environment == 2 %}
                 <div class="alert alert-warning py-2 small mb-3">
                     ⚠️ <strong>Ambiente de Homologação</strong> — esta NF <u>não tem validade fiscal</u>.
-                    Configure o ambiente em <strong>Empresa → Editar</strong> para emitir em Produção.
+                    Configure em <strong>Empresa → Editar</strong> para emitir em Produção.
                 </div>
                 {% endif %}
-
-                <!-- Aviso itens sem fiscal -->
                 {% for item in order.items.all %}
                     {% if not item.cfop %}
                     <div class="alert alert-danger py-2 small mb-3">
-                        ⛔ O item <strong>{{ item.variant.product.name }}</strong> não possui CFOP definido.
-                        Salve o pedido para aplicar as regras fiscais antes de gerar a NF.
+                        ⛔ O item <strong>{{ item.variant.product.name }}</strong> não possui CFOP.
+                        Salve o pedido antes de gerar a NF.
                     </div>
                     {% endif %}
                 {% endfor %}
-
                 <p class="text-muted small mb-0">
-                    A nota será gerada com status <strong>Rascunho</strong>. Você poderá revisar antes de transmitir à SEFAZ.
+                    A nota será gerada com status <strong>Rascunho</strong>. Revise antes de transmitir à SEFAZ.
                 </p>
-
             </div>
-
             <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    Cancelar
-                </button>
-
-                <!-- POST para a view gerar_nfe -->
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="post" action="{% url 'gerar_nfe' order.pk %}" id="form-gerar-nf">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-success fw-semibold px-4" id="btn-confirmar-gerar">
                         <span id="btn-gerar-texto">
-                            ✅ Gerar
-                            {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}NF{% endif %}
+                            ✅ Gerar {% if order.document_model == '55' %}NF-e{% elif order.document_model == '65' %}NFC-e{% else %}NF{% endif %}
                         </span>
                         <span id="btn-gerar-loading" class="d-none">
                             <span class="spinner-border spinner-border-sm me-1"></span> Gerando...
@@ -431,36 +418,12 @@
                     </button>
                 </form>
             </div>
-
         </div>
     </div>
 </div>
-
-<script>
-/* Spinner enquanto gera a NF */
-document.getElementById('form-gerar-nf').addEventListener('submit', function () {
-    document.getElementById('btn-gerar-texto').classList.add('d-none');
-    document.getElementById('btn-gerar-loading').classList.remove('d-none');
-    document.getElementById('btn-confirmar-gerar').disabled = true;
-});
-</script>
 {% endif %}
 
-<!-- ===== TEMPLATES DJANGO (hidden) ===== -->
-<template id="empty-payment-template">
-<tr class="payment-row">
-    <td>{{ payment_formset.empty_form.payment_method }}</td>
-    <td>{{ payment_formset.empty_form.bank }}</td>
-    <td>{{ payment_formset.empty_form.total_value }}</td>
-    <td>{{ payment_formset.empty_form.parcels }}</td>
-    <td>{{ payment_formset.empty_form.interval_days }}</td>
-    <td>
-        {{ payment_formset.empty_form.DELETE }}
-        <button type="button" class="btn btn-sm btn-danger remove-payment">✕</button>
-    </td>
-</tr>
-</template>
-
+<!-- ===== TEMPLATE: item de pedido ===== -->
 <template id="empty-form-template">
 <tr class="item-form">
     <td>{{ formset.empty_form.variant }}</td>
@@ -479,165 +442,385 @@ document.getElementById('form-gerar-nf').addEventListener('submit', function () 
 </tr>
 </template>
 
+<!-- ===== TEMPLATE: bloco de pagamento ===== -->
+<template id="empty-payment-template">
+<div class="payment-block" data-payment-index="__pidx__">
+    <div class="payment-block-header">
+        <input type="hidden" name="payments-__pidx__-id" value="">
+        <div style="min-width:160px">
+            <div class="small text-muted mb-1">Forma de Pagamento</div>
+            {{ payment_formset.empty_form.payment_method }}
+        </div>
+        <div style="min-width:160px">
+            <div class="small text-muted mb-1">Banco</div>
+            {{ payment_formset.empty_form.bank }}
+        </div>
+        <div style="width:120px">
+            <div class="small text-muted mb-1">Valor Total</div>
+            {{ payment_formset.empty_form.total_value }}
+        </div>
+        <div style="width:75px">
+            <div class="small text-muted mb-1">Parcelas</div>
+            {{ payment_formset.empty_form.parcels }}
+        </div>
+        <div style="width:90px">
+            <div class="small text-muted mb-1">Intervalo (dias)</div>
+            {{ payment_formset.empty_form.interval_days }}
+        </div>
+        <div class="ms-auto d-flex gap-2 align-items-center">
+            <button type="button" class="btn btn-primary btn-sm btn-gerar-parcelas" data-idx="__pidx__">⚡ Gerar</button>
+            <button type="button" class="btn btn-outline-danger btn-sm remove-payment">✕</button>
+            <input type="checkbox" name="payments-__pidx__-DELETE" style="display:none">
+        </div>
+    </div>
+    <div class="payment-block-parcels">
+        <input type="hidden" name="parcels-__pidx__-TOTAL_FORMS"   value="0">
+        <input type="hidden" name="parcels-__pidx__-INITIAL_FORMS" value="0">
+        <input type="hidden" name="parcels-__pidx__-MIN_NUM_FORMS"  value="0">
+        <input type="hidden" name="parcels-__pidx__-MAX_NUM_FORMS"  value="1000">
+        <table class="table parcels-table align-middle mb-2" style="font-size:.875rem">
+            <thead>
+                <tr>
+                    <th style="width:55px">#</th>
+                    <th>Valor</th>
+                    <th>Vencimento</th>
+                    <th style="width:50px" class="text-center">Del</th>
+                </tr>
+            </thead>
+            <tbody class="parcel-rows"></tbody>
+        </table>
+        <button type="button" class="btn btn-outline-secondary btn-sm btn-add-parcel-row" data-idx="__pidx__">+ Linha</button>
+        <div class="parcel-sum-feedback mt-2 small">Soma: <strong class="parcel-sum-value">R$ 0,00</strong></div>
+    </div>
+</div>
+</template>
+
 {% include 'orders/status_block.html' %}
 
-<!-- Scripts -->
+<!-- ===== SCRIPTS ===== -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="{% static 'js/order_form.js' %}?v={{ order.id }}-2"></script>
 
 <script>
-/* ================================================================
+/* ----------------------------------------------------------------
    PREVIEW FISCAL
-================================================================ */
+---------------------------------------------------------------- */
 const ORDER_ID   = {{ order.id }};
 const FISCAL_URL = "{% url 'ajax_fiscal_item' %}";
 
 window.fetchFiscalPreview = function (variantId, quantity, price, discount, addition) {
-
     if (!variantId) {
         document.getElementById('fiscal-preview').style.display = 'none';
         document.getElementById('fiscal-warning').style.display = 'none';
         return;
     }
-
     const params = new URLSearchParams({
-        variant_id: variantId,
-        order_id:   ORDER_ID,
-        quantity:   quantity  || 1,
-        price:      price     || 0,
-        discount:   discount  || 0,
-        addition:   addition  || 0,
+        variant_id: variantId, order_id: ORDER_ID,
+        quantity: quantity || 1, price: price || 0,
+        discount: discount || 0, addition: addition || 0,
     });
-
     fetch(`${FISCAL_URL}?${params}`)
         .then(r => r.json())
-        .then(function (data) {
+        .then(data => {
             const preview = document.getElementById('fiscal-preview');
             const warning = document.getElementById('fiscal-warning');
-
-            if (!data.found) {
-                preview.style.display = 'none';
-                warning.style.display = '';
-                return;
-            }
-
-            warning.style.display = 'none';
-            preview.style.display = '';
-
+            if (!data.found) { preview.style.display = 'none'; warning.style.display = ''; return; }
+            warning.style.display = 'none'; preview.style.display = '';
             document.getElementById('fp-cfop').textContent   = data.cfop   || '—';
             document.getElementById('fp-ncm').textContent    = data.ncm    || '—';
             document.getElementById('fp-cst').textContent    = data.icms_csosn || data.icms_cst || '—';
             document.getElementById('fp-icms').textContent   = data.icms_value
-                ? `R$ ${parseFloat(data.icms_value).toFixed(2)} (${data.icms_rate}%)`
-                : '—';
+                ? `R$ ${parseFloat(data.icms_value).toFixed(2)} (${data.icms_rate}%)` : '—';
             document.getElementById('fp-pis').textContent    = data.pis_value
-                ? `R$ ${parseFloat(data.pis_value).toFixed(2)}`
-                : '—';
+                ? `R$ ${parseFloat(data.pis_value).toFixed(2)}` : '—';
             document.getElementById('fp-cofins').textContent = data.cofins_value
-                ? `R$ ${parseFloat(data.cofins_value).toFixed(2)}`
-                : '—';
+                ? `R$ ${parseFloat(data.cofins_value).toFixed(2)}` : '—';
         })
-        .catch(function () {
-            document.getElementById('fiscal-preview').style.display = 'none';
-        });
+        .catch(() => { document.getElementById('fiscal-preview').style.display = 'none'; });
 };
 
-/* ================================================================
-   FINANCEIRO
-================================================================ */
-document.addEventListener('DOMContentLoaded', function () {
-
-    const totalPedidoEl     = document.getElementById('total-pedido');
-    const totalPagamentosEl = document.getElementById('total-pagamentos');
-    const saldoEl           = document.getElementById('saldo-pedido');
-    const pagoMsg           = document.getElementById('msg-pago');
-    const parcialMsg        = document.getElementById('msg-parcial');
-    const form              = document.querySelector('form');
-
-    function parseValue(v) { return parseFloat(v) || 0; }
-    function formatMoney(v) {
-        return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    window.calcularSaldo = function () {
-        const totalPedido = parseFloat(totalPedidoEl.dataset.valor || 0);
-        let totalPagamentos = 0;
-
-        document.querySelectorAll('#payments-table tr').forEach(function (row) {
-            if (row.style.display === 'none') return;
-            const input = row.querySelector('input[name$="total_value"]');
-            if (input) totalPagamentos += parseValue(input.value);
-        });
-
-        let saldo = totalPedido - totalPagamentos;
-        if (saldo < 0) saldo = 0;
-
-        totalPagamentosEl.innerText = 'R$ ' + formatMoney(totalPagamentos);
-        saldoEl.innerText           = 'R$ ' + formatMoney(saldo);
-        saldoEl.classList.remove('text-success', 'text-danger');
-        pagoMsg.classList.add('d-none');
-        parcialMsg.classList.add('d-none');
-
-        if (saldo === 0 && totalPedido > 0) {
-            saldoEl.classList.add('text-success');
-            pagoMsg.classList.remove('d-none');
-        } else if (saldo > 0) {
-            saldoEl.classList.add('text-danger');
-            parcialMsg.classList.remove('d-none');
-        }
-
-        return saldo;
-    };
-
-    form.addEventListener('submit', function (e) {
-        const saldo = calcularSaldo();
-        if (saldo > 0) {
-            e.preventDefault();
-            alert('Não é possível salvar pedido com saldo pendente.');
-            return false;
-        }
-    });
-
-    document.getElementById('add-payment').addEventListener('click', function () {
-        const totalForms = document.getElementById('id_payments-TOTAL_FORMS');
-        const count      = parseInt(totalForms.value);
-        const html = document.getElementById('empty-payment-template')
-                             .innerHTML.replace(/__prefix__/g, count);
-        document.getElementById('payments-table').insertAdjacentHTML('beforeend', html);
-        totalForms.value = count + 1;
-    });
-
-    document.addEventListener('click', function (e) {
-        if (e.target.classList.contains('remove-payment')) {
-            const row = e.target.closest('tr');
-            const cb  = row.querySelector('input[type="checkbox"]');
-            if (cb) cb.checked = true;
-            row.style.display = 'none';
-            calcularSaldo();
-        }
-    });
-
-    document.addEventListener('input', function (e) {
-        if (e.target.name && e.target.name.includes('total_value')) calcularSaldo();
-    });
-
-    calcularSaldo();
+/* ----------------------------------------------------------------
+   SPINNER MODAL NF
+---------------------------------------------------------------- */
+{% if order.status == 'FATURADO' and not invoice_ativa %}
+document.getElementById('form-gerar-nf').addEventListener('submit', function () {
+    document.getElementById('btn-gerar-texto').classList.add('d-none');
+    document.getElementById('btn-gerar-loading').classList.remove('d-none');
+    document.getElementById('btn-confirmar-gerar').disabled = true;
 });
+{% endif %}
+
+/* ----------------------------------------------------------------
+   PAGAMENTOS + PARCELAS
+   — único bloco JS, sem calcularSaldo legado
+---------------------------------------------------------------- */
+(function () {
+
+const PM_CONFIG  = {{ payment_methods_json|safe }};
+// Começa com o total salvo; order_form.js atualiza via updatePaymentSummaryFromItems()
+let TOTAL_PEDIDO = parseFloat('{{ total_order|floatformat:2 }}'.replace(',', '.')) || 0;
+
+function fmt(v) {
+    return 'R$ ' + parseFloat(v || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+}
+function getFloat(el) { return parseFloat(el?.value || 0) || 0; }
+
+/* Chamado por order_form.js quando o total de itens muda */
+window.updatePaymentSummaryFromItems = function (total) {
+    TOTAL_PEDIDO = total;
+    document.getElementById('lbl-pay-pedido').textContent = fmt(total);
+    calcSaldoGeral();
+};
+
+/* ── Saldo geral (barra de progresso) ── */
+function calcSaldoGeral() {
+    let paid = 0;
+    document.querySelectorAll('.payment-block').forEach(block => {
+        if (block.style.display === 'none') return;
+        const del = block.querySelector('input[name$="-DELETE"]');
+        if (del && del.checked) return;
+        paid += getFloat(block.querySelector('input[name$="-total_value"]'));
+    });
+
+    const saldo = TOTAL_PEDIDO - paid;
+    const pct   = TOTAL_PEDIDO > 0 ? Math.min(paid / TOTAL_PEDIDO * 100, 100) : 0;
+
+    document.getElementById('lbl-pay-total').textContent = fmt(paid);
+    document.getElementById('lbl-pay-saldo').textContent = fmt(Math.abs(saldo));
+
+    const bar = document.getElementById('pay-saldo-bar');
+    bar.style.width      = pct + '%';
+    bar.style.background = Math.abs(saldo) < 0.01 ? '#198754'
+                         : paid > TOTAL_PEDIDO     ? '#dc3545' : '#fbbf24';
+
+    const lbl = document.getElementById('lbl-pay-saldo');
+    lbl.className = 'fw-bold ' + (Math.abs(saldo) < 0.01 ? 'text-success' : 'text-danger');
+
+    document.getElementById('msg-pago').classList.toggle('d-none',    Math.abs(saldo) > 0.01);
+    document.getElementById('msg-parcial').classList.toggle('d-none', Math.abs(saldo) < 0.01);
+}
+
+/* ── Soma parcelas de um bloco ── */
+function calcParcelsSum(block) {
+    let sum = 0;
+    block.querySelectorAll('.parcel-row').forEach(row => {
+        if (row.style.display === 'none') return;
+        const del = row.querySelector('input[name$="-DELETE"]');
+        if (del && del.checked) return;
+        sum += getFloat(row.querySelector('input[name$="-value"]'));
+    });
+    const el = block.querySelector('.parcel-sum-value');
+    if (el) {
+        el.textContent = fmt(sum);
+        const total = getFloat(block.querySelector('input[name$="-total_value"]'));
+        el.closest('.parcel-sum-feedback').style.color = Math.abs(sum - total) < 0.01 ? '#198754' : '#dc3545';
+    }
+    return sum;
+}
+
+/* ── Gera parcelas para um bloco ── */
+function gerarParcelas(block) {
+    const idx      = block.dataset.paymentIndex;
+    const totalInp = block.querySelector('input[name$="-total_value"]');
+    const parcsInp = block.querySelector('input[name$="-parcels"]');
+    const intvInp  = block.querySelector('input[name$="-interval_days"]');
+    const pmSel    = block.querySelector('select[name$="-payment_method"]');
+    const total    = getFloat(totalInp);
+
+    if (!total) { alert('Informe o valor do pagamento antes de gerar parcelas.'); return; }
+
+    let nParcels = parseInt(parcsInp?.value || 1);
+    let interval = parseInt(intvInp?.value  || 30);
+
+    if (pmSel?.value) {
+        const pm = PM_CONFIG.find(p => p.id == parseInt(pmSel.value));
+        if (pm) {
+            if (nParcels <= 1)   { parcsInp.value = pm.default_parcels; nParcels = pm.default_parcels; }
+            if (interval === 30) { intvInp.value  = pm.interval_days;   interval = pm.interval_days;   }
+        }
+    }
+    if (nParcels < 1) nParcels = 1;
+
+    // Limpa: remove novas, marca salvas para DELETE
+    block.querySelectorAll('.parcel-row').forEach(row => {
+        const idInp = row.querySelector('input[name$="-id"]');
+        if (idInp?.value) {
+            const cb = row.querySelector('input[name$="-DELETE"]');
+            if (cb) { cb.checked = true; row.style.display = 'none'; }
+        } else {
+            row.remove();
+        }
+    });
+
+    const tfInput = block.querySelector(`input[name="parcels-${idx}-TOTAL_FORMS"]`);
+    let   formIdx = parseInt(tfInput?.value || 0);
+    const base    = Math.floor(total / nParcels * 100) / 100;
+    let   acum    = 0;
+    const today   = new Date();
+
+    for (let i = 0; i < nParcels; i++) {
+        const isLast = (i === nParcels - 1);
+        const value  = isLast ? parseFloat((total - acum).toFixed(2)) : base;
+        if (!isLast) acum = parseFloat((acum + base).toFixed(2));
+
+        const due = new Date(today);
+        due.setDate(due.getDate() + (i + 1) * interval);
+
+        const tr = document.createElement('tr');
+        tr.className = 'parcel-row';
+        tr.innerHTML =
+            `<td><input type="number" name="parcels-${idx}-${formIdx}-parcel_number" value="${i+1}" class="form-control form-control-sm text-center" style="width:55px"></td>` +
+            `<td><input type="number" step="0.01" name="parcels-${idx}-${formIdx}-value" value="${value.toFixed(2)}" class="form-control form-control-sm text-end parcel-value"></td>` +
+            `<td><input type="date" name="parcels-${idx}-${formIdx}-due_date" value="${due.toISOString().slice(0,10)}" class="form-control form-control-sm"></td>` +
+            `<td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm px-2 remove-parcel-row">✕</button></td>`;
+        block.querySelector('.parcel-rows').appendChild(tr);
+        formIdx++;
+    }
+    if (tfInput) tfInput.value = formIdx;
+    calcParcelsSum(block);
+}
+
+/* ── Adiciona linha manual de parcela ── */
+function addParcelRow(block) {
+    const idx     = block.dataset.paymentIndex;
+    const tfInput = block.querySelector(`input[name="parcels-${idx}-TOTAL_FORMS"]`);
+    const count   = block.querySelectorAll('.parcel-row:not([style*="display: none"]):not([style*="display:none"])').length;
+    let   formIdx = parseInt(tfInput?.value || 0);
+
+    const pmSel = block.querySelector('select[name$="-payment_method"]');
+    const pm    = PM_CONFIG.find(p => p.id == parseInt(pmSel?.value || 0));
+    const intv  = pm ? pm.interval_days
+                     : parseInt(block.querySelector('input[name$="-interval_days"]')?.value || 30);
+
+    const due = new Date();
+    due.setDate(due.getDate() + (count + 1) * intv);
+
+    const tr = document.createElement('tr');
+    tr.className = 'parcel-row';
+    tr.innerHTML =
+        `<td><input type="number" name="parcels-${idx}-${formIdx}-parcel_number" value="${count+1}" class="form-control form-control-sm text-center" style="width:55px"></td>` +
+        `<td><input type="number" step="0.01" name="parcels-${idx}-${formIdx}-value" class="form-control form-control-sm text-end parcel-value"></td>` +
+        `<td><input type="date" name="parcels-${idx}-${formIdx}-due_date" value="${due.toISOString().slice(0,10)}" class="form-control form-control-sm"></td>` +
+        `<td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm px-2 remove-parcel-row">✕</button></td>`;
+    block.querySelector('.parcel-rows').appendChild(tr);
+    if (tfInput) tfInput.value = formIdx + 1;
+}
+
+/* ── Adicionar bloco de pagamento ── */
+document.getElementById('add-payment').addEventListener('click', function () {
+    const tf   = document.getElementById('id_payments-TOTAL_FORMS');
+    const pidx = document.querySelectorAll('.payment-block').length;
+    const tpl  = document.getElementById('empty-payment-template').innerHTML
+                    .replace(/__pidx__/g, String(pidx))
+                    .replace(/payments-__prefix__/g, `payments-${pidx}`)
+                    .replace(/__prefix__/g, String(pidx));
+    document.getElementById('payments-container').insertAdjacentHTML('beforeend', tpl);
+    tf.value = pidx + 1;
+    calcSaldoGeral();
+});
+
+/* ── Delegação de eventos ── */
+document.addEventListener('click', function (e) {
+
+    if (e.target.classList.contains('remove-payment')) {
+        const block = e.target.closest('.payment-block');
+        const cb    = block.querySelector('input[name$="-DELETE"]');
+        if (cb) { cb.checked = true; block.style.display = 'none'; } else { block.remove(); }
+        calcSaldoGeral();
+        return;
+    }
+    if (e.target.classList.contains('btn-gerar-parcelas')) {
+        gerarParcelas(e.target.closest('.payment-block'));
+        return;
+    }
+    if (e.target.classList.contains('remove-parcel-row')) {
+        const row   = e.target.closest('tr');
+        const block = row.closest('.payment-block');
+        row.remove();
+        calcParcelsSum(block);
+        return;
+    }
+    if (e.target.classList.contains('del-parcel-label')) {
+        const row   = e.target.closest('tr');
+        const block = row.closest('.payment-block');
+        const cb    = row.querySelector('input[name$="-DELETE"]');
+        if (cb) { cb.checked = true; row.style.display = 'none'; }
+        calcParcelsSum(block);
+        return;
+    }
+    if (e.target.classList.contains('btn-add-parcel-row')) {
+        addParcelRow(e.target.closest('.payment-block'));
+        return;
+    }
+});
+
+/* ── Recalcula ao digitar ── */
+document.addEventListener('input', function (e) {
+    if (e.target.name?.endsWith('-total_value') || e.target.classList.contains('parcel-value')) {
+        const block = e.target.closest('.payment-block');
+        if (block) calcParcelsSum(block);
+        calcSaldoGeral();
+    }
+});
+
+/* ── Auto-preenche ao mudar forma de pagamento ── */
+document.addEventListener('change', function (e) {
+    if (e.target.name?.endsWith('-payment_method')) {
+        const pm    = PM_CONFIG.find(p => p.id == parseInt(e.target.value));
+        const block = e.target.closest('.payment-block');
+        if (!pm || !block) return;
+        const bankSel = block.querySelector('select[name$="-bank"]');
+        const parcSel = block.querySelector('input[name$="-parcels"]');
+        const intvSel = block.querySelector('input[name$="-interval_days"]');
+        if (pm.default_bank && bankSel) bankSel.value = pm.default_bank;
+        if (parcSel) parcSel.value = pm.default_parcels;
+        if (intvSel) intvSel.value = pm.interval_days;
+    }
+});
+
+/* ── Validação no submit ── */
+document.querySelector('form').addEventListener('submit', function (e) {
+    // 1) soma pagamentos == total pedido
+    let totalPagos = 0;
+    document.querySelectorAll('.payment-block').forEach(block => {
+        if (block.style.display === 'none') return;
+        const del = block.querySelector('input[name$="-DELETE"]');
+        if (del && del.checked) return;
+        totalPagos += getFloat(block.querySelector('input[name$="-total_value"]'));
+    });
+    if (TOTAL_PEDIDO > 0 && Math.abs(TOTAL_PEDIDO - totalPagos) > 0.01) {
+        e.preventDefault();
+        alert(`A soma dos pagamentos (${fmt(totalPagos)}) precisa ser igual ao total do pedido (${fmt(TOTAL_PEDIDO)}).`);
+        return;
+    }
+    // 2) soma parcelas == valor do pagamento
+    let parcelError = false;
+    document.querySelectorAll('.payment-block').forEach(block => {
+        if (block.style.display === 'none') return;
+        const del = block.querySelector('input[name$="-DELETE"]');
+        if (del && del.checked) return;
+        const total = getFloat(block.querySelector('input[name$="-total_value"]'));
+        const rows  = block.querySelectorAll('.parcel-row:not([style*="display: none"]):not([style*="display:none"])');
+        if (rows.length > 0 && total > 0 && Math.abs(calcParcelsSum(block) - total) > 0.01) {
+            parcelError = true;
+        }
+    });
+    if (parcelError) {
+        e.preventDefault();
+        alert('A soma das parcelas em um ou mais pagamentos não confere com o valor informado.');
+    }
+});
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function () {
+    calcSaldoGeral();
+    document.querySelectorAll('.payment-block').forEach(calcParcelsSum);
+});
+
+})();
 </script>
-
-<style>
-.order-locked input,
-.order-locked select,
-.order-locked textarea,
-.order-locked button { pointer-events: none; opacity: 0.6; }
-.order-locked input,
-.order-locked select,
-.order-locked textarea { background-color: #f8f9fa !important; }
-
-.select2-container .select2-selection--single          { height: 38px; padding: 4px 8px; }
-.select2-container--default .select2-selection--single { border: 1px solid #ced4da; border-radius: .375rem; }
-.select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 28px; }
-</style>
+<script src="{% static 'js/order_form.js' %}?v={{ order.id }}-3"></script>
 
 {% endblock %}

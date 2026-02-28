@@ -1,154 +1,396 @@
 {% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
 {% block content %}
 
-<div class="container mt-4">
+<style>
+.card-section {
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom: 1.5rem;
+}
+.card-section .card-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 14px 14px 0 0 !important;
+    font-weight: 600;
+    padding: .85rem 1.25rem;
+}
+.table thead th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+.parcel-row td { vertical-align: middle; }
+#saldo-bar {
+    height: 6px;
+    border-radius: 3px;
+    transition: width .3s, background .3s;
+}
+.badge-tipo-in  { background:#d1fae5; color:#065f46; }
+.badge-tipo-out { background:#fee2e2; color:#991b1b; }
+</style>
 
-    <h4>{{ title }}</h4>
+<!-- CABEÇALHO -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">{{ title }}</h2>
+    <a href="{% url 'financial_list' %}" class="btn btn-outline-secondary btn-sm">← Voltar</a>
+</div>
 
-    <form method="post">
-        {% csrf_token %}
+<form method="post" id="financial-form">
+    {% csrf_token %}
 
-        <div class="card mb-4">
-            <div class="card-header">
-                Dados do Lançamento
-            </div>
-            <div class="card-body">
+    <!-- ── DADOS DO LANÇAMENTO ─────────────────────────────── -->
+    <div class="card card-section">
+        <div class="card-header">📋 Dados do Lançamento</div>
+        <div class="card-body">
+            <div class="row g-3">
 
-                <div class="row mb-3">
-                    <div class="col-md-2">
-                        <label>Tipo</label>
-                        {{ form.type }}
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <label>Cliente</label>
-                        {{ form.client }}
-                    </div>
-
-                    <div class="col-md-2">
-                        <label>Forma de Pagamento</label>
-                        {{ form.payment_method }}
-                    </div>
-
-                    <div class="col-md-2">
-                        <label>Banco</label>
-                        {{ form.bank }}
-                    </div>
-
-                    <div class="col-md-2">
-                        <label>Valor Total</label>
-                        {{ form.total_value }}
-                    </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Tipo</label>
+                    {{ form.type }}
+                    {% if form.type.errors %}<div class="text-danger small mt-1">{{ form.type.errors }}</div>{% endif %}
                 </div>
 
-                <div class="mb-3">
-                    <label>Descrição</label>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Cliente / Fornecedor</label>
+                    {{ form.client }}
+                    {% if form.client.errors %}<div class="text-danger small mt-1">{{ form.client.errors }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Descrição</label>
                     {{ form.description }}
+                    {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">
+                        Valor Total
+                        <span class="text-muted fw-normal small">(deve igualar parcelas)</span>
+                    </label>
+                    {{ form.total_value }}
+                    {% if form.total_value.errors %}<div class="text-danger small mt-1">{{ form.total_value.errors }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Forma de Pagamento</label>
+                    {{ form.payment_method }}
+                    {% if form.payment_method.errors %}<div class="text-danger small mt-1">{{ form.payment_method.errors }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Banco</label>
+                    {{ form.bank }}
+                    {% if form.bank.errors %}<div class="text-danger small mt-1">{{ form.bank.errors }}</div>{% endif %}
                 </div>
 
             </div>
         </div>
+    </div>
 
-        <div class="card">
-            <div class="card-header d-flex justify-content-between">
-                Parcelas
-                <button type="button" class="btn btn-sm btn-success" id="add-parcel">
-                    + Adicionar Parcela
+    <!-- ── PARCELAS ───────────────────────────────────────── -->
+    <div class="card card-section">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>💰 Parcelas</span>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <!-- Barra de saldo -->
+                <div class="d-flex flex-column" style="min-width:200px">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Parcelas</span>
+                        <span id="lbl-total-parcel" class="fw-semibold">R$ 0,00</span>
+                        <span class="text-muted">/ <span id="lbl-total-value">R$ 0,00</span></span>
+                    </div>
+                    <div class="bg-light rounded" style="height:6px; overflow:hidden">
+                        <div id="saldo-bar" style="width:0%; height:100%; background:#198754;"></div>
+                    </div>
+                </div>
+                <!-- Botão gerar parcelas -->
+                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-gerar-parcelas">
+                    ⚡ Gerar Parcelas
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm px-3" id="btn-add-parcel">
+                    + Adicionar Linha
                 </button>
             </div>
+        </div>
 
-            <div class="card-body">
+        <div class="card-body p-0">
 
-                {{ formset.management_form }}
+            {{ formset.management_form }}
 
-                <table class="table table-bordered" id="parcel-table">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0" id="parcel-table">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Valor</th>
-                            <th>Desconto</th>
-                            <th>Acréscimo</th>
-                            <th>Vencimento</th>
-                            <th>Pago</th>
-                            <th width="80">Excluir</th>
+                            <th style="width:55px" class="ps-3">#</th>
+                            <th style="width:130px">Valor</th>
+                            <th style="width:110px">Desconto</th>
+                            <th style="width:110px">Acréscimo</th>
+                            <th style="width:155px">Vencimento</th>
+                            <th style="width:70px" class="text-center">Pago</th>
+                            <th style="width:60px" class="text-center">Excluir</th>
                         </tr>
                     </thead>
-                    <tbody>
-
-                        {% for form in formset %}
-                        <tr class="parcel-form">
-                            <td>{{ form.parcel }}</td>
-                            <td>{{ form.value }}</td>
-                            <td>{{ form.discount }}</td>
-                            <td>{{ form.addition }}</td>
-                            <td>{{ form.deadline }}</td>
-                            <td class="text-center">{{ form.payed }}</td>
+                    <tbody id="parcel-body">
+                        {% for pform in formset %}
+                        <tr class="parcel-row">
+                            <td class="ps-3">{{ pform.parcel }}</td>
+                            <td>{{ pform.value }}</td>
+                            <td>{{ pform.discount }}</td>
+                            <td>{{ pform.addition }}</td>
+                            <td>{{ pform.deadline }}</td>
+                            <td class="text-center">{{ pform.payed }}</td>
                             <td class="text-center">
-                                {% if form.instance.pk %}
-                                    {{ form.DELETE }}
+                                {{ pform.id }}
+                                {% if pform.instance.pk %}
+                                    {{ pform.DELETE }}
+                                    <label class="btn btn-outline-danger btn-sm px-2 py-1 del-label">
+                                        ✕
+                                    </label>
                                 {% else %}
-                                    <button type="button" class="btn btn-sm btn-danger remove-row">
-                                        X
-                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm px-2 py-1 remove-row">✕</button>
                                 {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
-
                     </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <td colspan="6" class="text-end fw-semibold ps-3 small text-muted">
+                                Saldo: <span id="lbl-saldo" class="fw-bold">R$ 0,00</span>
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
                 </table>
-
             </div>
+
         </div>
+    </div>
 
-        <div class="mt-3 text-end">
-            <a href="{% url 'financial_list' %}" class="btn btn-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-primary">Salvar</button>
-        </div>
+    <!-- ── SALVAR ─────────────────────────────────────────── -->
+    <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'financial_list' %}" class="btn btn-outline-secondary px-4">Cancelar</a>
+        <button type="submit" class="btn btn-primary px-5">💾 Salvar Lançamento</button>
+    </div>
 
-    </form>
+</form>
 
-</div>
+<!-- Template oculto para nova linha de parcela -->
+<template id="parcel-row-template">
+<tr class="parcel-row">
+    <td class="ps-3"><input type="number" name="parcels-__prefix__-parcel" class="form-control form-control-sm" style="width:60px"></td>
+    <td><input type="number" step="0.01" name="parcels-__prefix__-value" class="form-control form-control-sm parcel-value"></td>
+    <td><input type="number" step="0.01" name="parcels-__prefix__-discount" value="0" class="form-control form-control-sm"></td>
+    <td><input type="number" step="0.01" name="parcels-__prefix__-addition" value="0" class="form-control form-control-sm"></td>
+    <td><input type="date" name="parcels-__prefix__-deadline" class="form-control form-control-sm"></td>
+    <td class="text-center"><input type="checkbox" name="parcels-__prefix__-payed" class="form-check-input"></td>
+    <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm px-2 py-1 remove-row">✕</button></td>
+</tr>
+</template>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+// ── Config das formas de pagamento (vem da view) ────────────────────────────
+const PAYMENT_METHODS_CONFIG = {{ payment_methods_json|safe }};
 
-    const addBtn = document.getElementById("add-parcel");
-    const tableBody = document.querySelector("#parcel-table tbody");
-    const totalForms = document.getElementById("id_parcels-TOTAL_FORMS");
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function fmt(v) {
+    return parseFloat(v || 0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
 
-    addBtn.addEventListener("click", function() {
+function getTotalValue() {
+    return parseFloat(document.getElementById('id_total_value')?.value || 0);
+}
 
-        const formIndex = totalForms.value;
-
-        const row = document.createElement("tr");
-        row.classList.add("parcel-form");
-
-        row.innerHTML = `
-            <td><input type="number" name="parcels-${formIndex}-parcel" class="form-control"></td>
-            <td><input type="number" step="0.01" name="parcels-${formIndex}-value" class="form-control"></td>
-            <td><input type="number" step="0.01" name="parcels-${formIndex}-discount" class="form-control"></td>
-            <td><input type="number" step="0.01" name="parcels-${formIndex}-addition" class="form-control"></td>
-            <td><input type="date" name="parcels-${formIndex}-deadline" class="form-control"></td>
-            <td class="text-center">
-                <input type="checkbox" name="parcels-${formIndex}-payed" class="form-check-input">
-            </td>
-            <td class="text-center">
-                <button type="button" class="btn btn-sm btn-danger remove-row">X</button>
-            </td>
-        `;
-
-        tableBody.appendChild(row);
-        totalForms.value = parseInt(totalForms.value) + 1;
+function getTotalParcels() {
+    let sum = 0;
+    document.querySelectorAll('.parcel-row').forEach(function(row) {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('input[name$="-DELETE"]');
+        if (cb && cb.checked) return;
+        const v = row.querySelector('input[name$="-value"]');
+        if (v) sum += parseFloat(v.value || 0);
     });
+    return sum;
+}
 
-    document.addEventListener("click", function(e) {
-        if (e.target.classList.contains("remove-row")) {
-            e.target.closest("tr").remove();
+function updateSaldo() {
+    const total   = getTotalValue();
+    const parcels = getTotalParcels();
+    const saldo   = total - parcels;
+
+    document.getElementById('lbl-total-value').textContent  = 'R$ ' + fmt(total);
+    document.getElementById('lbl-total-parcel').textContent = 'R$ ' + fmt(parcels);
+    document.getElementById('lbl-saldo').textContent        = 'R$ ' + fmt(Math.abs(saldo));
+
+    const bar = document.getElementById('saldo-bar');
+    const pct = total > 0 ? Math.min(parcels / total * 100, 100) : 0;
+    bar.style.width = pct + '%';
+
+    if (Math.abs(saldo) < 0.01) {
+        bar.style.background = '#198754';  // verde — OK
+        document.getElementById('lbl-saldo').classList.remove('text-danger');
+        document.getElementById('lbl-saldo').classList.add('text-success');
+    } else if (parcels > total) {
+        bar.style.background = '#dc3545';  // vermelho — excesso
+        document.getElementById('lbl-saldo').classList.add('text-danger');
+        document.getElementById('lbl-saldo').classList.remove('text-success');
+    } else {
+        bar.style.background = '#fbbf24';  // amarelo — falta
+        document.getElementById('lbl-saldo').classList.add('text-danger');
+        document.getElementById('lbl-saldo').classList.remove('text-success');
+    }
+}
+
+// ── Gerar parcelas automaticamente ─────────────────────────────────────────
+document.getElementById('btn-gerar-parcelas').addEventListener('click', function() {
+    const total = getTotalValue();
+    if (!total || total <= 0) {
+        alert('Informe o valor total antes de gerar as parcelas.');
+        return;
+    }
+
+    const pmSel = document.getElementById('id_payment_method');
+    const pmId  = parseInt(pmSel?.value);
+    const pm    = PAYMENT_METHODS_CONFIG.find(p => p.id === pmId);
+
+    const nParcels    = pm ? pm.default_parcels    : 1;
+    const intervalDays = pm ? pm.interval_days     : 30;
+
+    // Limpa parcelas não salvas (sem id oculto com valor)
+    document.querySelectorAll('.parcel-row').forEach(function(row) {
+        const idInput = row.querySelector('input[name$="-id"]');
+        if (!idInput || !idInput.value) {
+            row.remove();
+        } else {
+            // Marca as existentes para DELETE
+            const cb = row.querySelector('input[name$="-DELETE"]');
+            if (cb) {
+                cb.checked = true;
+                row.style.display = 'none';
+            }
         }
     });
 
+    const base  = Math.floor((total / nParcels) * 100) / 100;
+    let   acum  = 0;
+    const today = new Date();
+    const totalForms = document.getElementById('id_parcels-TOTAL_FORMS');
+    let   formIdx    = parseInt(totalForms.value);
+
+    for (let i = 0; i < nParcels; i++) {
+        const isLast = (i === nParcels - 1);
+        const value  = isLast ? parseFloat((total - acum).toFixed(2)) : base;
+        if (!isLast) acum += base;
+
+        // Data de vencimento
+        const due = new Date(today);
+        due.setDate(due.getDate() + (i + 1) * intervalDays);
+        const dueStr = due.toISOString().slice(0, 10);
+
+        const tpl = document.getElementById('parcel-row-template').innerHTML
+            .replace(/__prefix__/g, formIdx);
+
+        const tmp = document.createElement('tbody');
+        tmp.innerHTML = tpl;
+        const row = tmp.querySelector('tr');
+
+        row.querySelector('input[name$="-parcel"]').value    = i + 1;
+        row.querySelector('input[name$="-value"]').value     = value.toFixed(2);
+        row.querySelector('input[name$="-deadline"]').value  = dueStr;
+
+        document.getElementById('parcel-body').appendChild(row);
+        formIdx++;
+    }
+
+    totalForms.value = formIdx;
+    updateSaldo();
 });
+
+// ── Adicionar linha manual ──────────────────────────────────────────────────
+document.getElementById('btn-add-parcel').addEventListener('click', function() {
+    const totalForms = document.getElementById('id_parcels-TOTAL_FORMS');
+    const formIdx    = parseInt(totalForms.value);
+    const count      = document.querySelectorAll('.parcel-row:not([style*="display: none"])').length;
+
+    const tpl = document.getElementById('parcel-row-template').innerHTML
+        .replace(/__prefix__/g, formIdx);
+
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = tpl;
+    const row = tmp.querySelector('tr');
+
+    row.querySelector('input[name$="-parcel"]').value = count + 1;
+
+    // Data de vencimento = hoje + interval_days da forma selecionada
+    const pmSel  = document.getElementById('id_payment_method');
+    const pmId   = parseInt(pmSel?.value);
+    const pm     = PAYMENT_METHODS_CONFIG.find(p => p.id === pmId);
+    const days   = pm ? pm.interval_days : 30;
+    const due    = new Date();
+    due.setDate(due.getDate() + (count + 1) * days);
+    row.querySelector('input[name$="-deadline"]').value = due.toISOString().slice(0, 10);
+
+    document.getElementById('parcel-body').appendChild(row);
+    totalForms.value = formIdx + 1;
+    updateSaldo();
+});
+
+// ── Remover linha nova ──────────────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-row')) {
+        e.target.closest('tr').remove();
+        updateSaldo();
+    }
+    // Label de DELETE para linhas salvas
+    if (e.target.classList.contains('del-label')) {
+        const row = e.target.closest('tr');
+        const cb  = row.querySelector('input[name$="-DELETE"]');
+        if (cb) { cb.checked = true; row.style.display = 'none'; }
+        updateSaldo();
+    }
+});
+
+// ── Recalcula saldo ao digitar valor ───────────────────────────────────────
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'id_total_value' || e.target.name?.endsWith('-value')) {
+        updateSaldo();
+    }
+});
+
+// ── Ao mudar forma de pagamento: preenche banco padrão ─────────────────────
+document.getElementById('id_payment_method')?.addEventListener('change', function() {
+    const pmId = parseInt(this.value);
+    const pm   = PAYMENT_METHODS_CONFIG.find(p => p.id === pmId);
+    if (pm && pm.default_bank) {
+        const bankSel = document.getElementById('id_bank');
+        if (bankSel) bankSel.value = pm.default_bank;
+    }
+});
+
+// ── Valida antes de submeter ────────────────────────────────────────────────
+document.getElementById('financial-form').addEventListener('submit', function(e) {
+    const total   = getTotalValue();
+    const parcels = getTotalParcels();
+    const diff    = Math.abs(total - parcels);
+
+    if (diff > 0.01) {
+        e.preventDefault();
+        alert(
+            `A soma das parcelas (R$ ${fmt(parcels)}) precisa ser igual ao valor total (R$ ${fmt(total)}).\n` +
+            `Diferença: R$ ${fmt(diff)}`
+        );
+    }
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', updateSaldo);
 </script>
 
 {% endblock %}

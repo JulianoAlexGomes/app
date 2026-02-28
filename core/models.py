@@ -617,11 +617,15 @@ class Orders(models.Model):
         ]
 
     def generate_financial(self):
-        # 🔒 evita duplicar
+        """
+        Cria FinancialMovement + FinancialMovementParcel para cada OrderPayment.
+        Usa as datas de OrderPaymentParcel (editadas pelo usuário no pedido).
+        Idempotente: não duplica se já existir.
+        """
         if self.financial_movements.exists():
             return
 
-        for payment in self.payments.all():
+        for payment in self.payments.prefetch_related('parcels_records').all():
 
             movement = FinancialMovement.objects.create(
                 business=self.business,
@@ -631,16 +635,44 @@ class Orders(models.Model):
                 payment_method=payment.payment_method,
                 type='in',
                 total_value=payment.total_value,
-                description=f'Pedido #{self.id}'
+                description=f'Pedido #{self.id}',
             )
 
-            for parcel in payment.parcels_records.all():
-                FinancialMovementParcel.objects.create(
-                    movement=movement,
-                    parcel=parcel.parcel_number,
-                    value=parcel.value,
-                    deadline=parcel.due_date
-                )
+            parcels = payment.parcels_records.all()
+
+            if parcels.exists():
+                # Usa as parcelas reais (com datas que o usuário definiu)
+                for p in parcels:
+                    FinancialMovementParcel.objects.create(
+                        movement=movement,
+                        parcel=p.parcel_number,
+                        value=p.value,
+                        deadline=p.due_date,
+                    )
+            else:
+                # Fallback: gera parcelas na hora se por algum motivo não existirem
+                from decimal import Decimal
+                from datetime import timedelta
+                from django.utils import timezone
+
+                total    = Decimal(payment.total_value)
+                n        = payment.parcels or 1
+                base     = (total / n).quantize(Decimal('0.01'))
+                acum     = Decimal('0.00')
+                today    = timezone.now().date()
+
+                for i in range(n):
+                    is_last = (i == n - 1)
+                    value   = (total - acum) if is_last else base
+                    if not is_last:
+                        acum += base
+                    due = today + timedelta(days=(i + 1) * (payment.interval_days or 30))
+                    FinancialMovementParcel.objects.create(
+                        movement=movement,
+                        parcel=i + 1,
+                        value=value,
+                        deadline=due,
+                    )
 
     # 🔥 HOOK AUTOMÁTICO AO FATURAR
     def save(self, *args, **kwargs):
@@ -822,12 +854,12 @@ class OrderPayment(models.Model):
                 due_date=due_date
             )
 
-    def save(self, *args, **kwargs):
-        creating = self.pk is None
-        super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     creating = self.pk is None
+    #     super().save(*args, **kwargs)
 
-        if creating:
-            self.generate_parcels()
+    #     if creating:
+    #         self.generate_parcels()
 
 class OrderPaymentParcel(models.Model):
     payment = models.ForeignKey(

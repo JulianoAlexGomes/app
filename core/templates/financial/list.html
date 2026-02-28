@@ -188,6 +188,7 @@ th.actions-col, td.actions-col { width: 110px; text-align: center; }
                     data-valor="{{ parcel.value|floatformat:2 }}"
                     data-vencimento="{{ parcel.deadline|date:'d/m/Y' }}"
                     data-payment-method-id="{{ parcel.movement.payment_method.pk|default:'' }}"
+                    data-bank-id="{{ parcel.bank.pk|default:'' }}"
                     title="Registrar pagamento">
                 <i class="bi bi-cash-stack"></i>
             </button>
@@ -512,7 +513,9 @@ new Chart(document.getElementById('financeChart'), {
         pmSelect.value = pmId;  // se não existir na lista, fica em "Manter atual"
 
         document.getElementById('pay-paydate').value = new Date().toISOString().slice(0, 10);
-        document.getElementById('pay-bank').value    = '';
+        const bankId = btn.dataset.bankId || '';
+        const bankSelect = document.getElementById('pay-bank');
+        bankSelect.value = bankId;
         document.getElementById('pay-erro').classList.add('d-none');
 
         new bootstrap.Modal(document.getElementById('modalPagamento')).show();
