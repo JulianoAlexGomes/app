@@ -17,4 +17,4 @@ staticfiles/
 # IDE
 .vscode/
 .idea/
-.core.migrations/
+.core.migrations/.env

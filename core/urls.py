@@ -6,6 +6,28 @@ from django.conf.urls.static import static
 
 urlpatterns = [
 
+    # Staff
+     # ── Painel SaaS Admin ──────────────────────────────────────
+    path('saas/',                                   SaasDashboardView.as_view(),      name='saas_dashboard'),
+
+    # Planos
+    path('saas/planos/',                            SaasPlanListView.as_view(),        name='saas_plan_list'),
+    path('saas/planos/novo/',                       SaasPlanCreateView.as_view(),      name='saas_plan_create'),
+    path('saas/planos/<int:pk>/editar/',            SaasPlanUpdateView.as_view(),      name='saas_plan_update'),
+    path('saas/planos/<int:pk>/excluir/',           SaasPlanDeleteView.as_view(),      name='saas_plan_delete'),
+
+    # Empresas
+    path('saas/empresas/',                          SaasBusinessListView.as_view(),    name='saas_business_list'),
+    path('saas/empresas/nova/',                     SaasBusinessCreateView.as_view(),  name='saas_business_create'),
+    path('saas/empresas/<int:pk>/editar/',          SaasBusinessUpdateView.as_view(),  name='saas_business_update'),
+    path('saas/empresas/<int:pk>/excluir/',         SaasBusinessDeleteView.as_view(),  name='saas_business_delete'),
+
+    # Usuários da empresa
+    path('saas/empresas/<int:business_pk>/usuarios/',           SaasUserListView.as_view(),   name='saas_user_list'),
+    path('saas/empresas/<int:business_pk>/usuarios/novo/',      SaasUserCreateView.as_view(), name='saas_user_create'),
+    path('saas/empresas/<int:business_pk>/usuarios/<int:pk>/editar/',  SaasUserUpdateView.as_view(), name='saas_user_update'),
+    path('saas/empresas/<int:business_pk>/usuarios/<int:pk>/excluir/', SaasUserDeleteView.as_view(), name='saas_user_delete'),
+
     # Login/Logout
     path('login/',  CustomLoginView.as_view(),  name='login'),
     path('logout/', CustomLogoutView.as_view(), name='logout'),
@@ -86,6 +108,7 @@ urlpatterns = [
     path('financeiro/parcela/<int:pk>/pagar/',  parcel_pay,        name='parcel_pay'),
     path('financeiro/parcela/<int:pk>/estornar/', parcel_unpay, name='parcel_unpay'),
     path('financeiro/historico/',               financial_history, name='financial_history'),
+    path('financeiro/<int:pk>/replicar/',       financial_replicate,name='financial_replicate'),
 
     # Empresa
     path('empresa/',                      BusinessListView.as_view(),   name='business_list'),
@@ -94,8 +117,10 @@ urlpatterns = [
     path('empresa/<int:pk>/excluir/',     BusinessDeleteView.as_view(), name='business_delete'),
 
     # Usuários
-    path('usuario/',       UserListView.as_view(),   name='user_list'),
-    path('usuario/novo/',  UserCreateView.as_view(),  name='user_create'),
+    path('usuario/',              UserListView.as_view(),   name='user_list'),
+    path('usuario/novo/',         UserCreateView.as_view(), name='user_create'),
+    path('usuario/<int:pk>/editar/', UserUpdateView.as_view(), name='user_update'),
+    path('usuario/<int:pk>/excluir/', UserDeleteView.as_view(), name='user_delete'),
 
     # NCM
     path('ncm/',                    NcmListView.as_view(),   name='ncm_list'),

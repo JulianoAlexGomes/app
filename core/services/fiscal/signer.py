@@ -1,87 +1,110 @@
 """
 core/services/fiscal/signer.py
 
-Assinatura digital do XML NF-e/NFC-e com certificado A1 (PFX/P12).
-Usa a API nativa da nfelib 2.3 que já encapsula o erpbrasil.assinatura.
+Assinatura digital XMLDSig para NF-e/NFC-e com certificado A1 (PFX/P12).
+Implementada com lxml + cryptography puras — sem erpbrasil, sem signxml.
 
 Dependências:
-    pip install nfelib==2.3.0 xsdata lxml
+    pip install lxml cryptography
 
 Uso:
-    from core.services.fiscal.signer import assinar_xml
-    xml_assinado = assinar_xml(invoice, xml_str)
+    from core.services.fiscal.signer import assinar_xml, assinar_xml_evento
+    xml_assinado    = assinar_xml(invoice, xml_str)
+    evento_assinado = assinar_xml_evento(pfx_bytes, senha, evento_xml, id_evento)
 """
 
 from __future__ import annotations
-import os
-from pathlib import Path
+from lxml import etree
+
+_NS_DS   = 'http://www.w3.org/2000/09/xmldsig#'
+_NS_C14N = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315'
 
 
-def _carregar_certificado(business) -> tuple[bytes, str]:
+def _assinar(xml_bytes: bytes, pfx_bytes: bytes, senha: str, ref_id: str) -> str:
     """
-    Carrega o PFX do certificado e a senha a partir do model Business.
+    Assina um XML NF-e/NFC-e ou Evento seguindo o padrão XMLDSig exigido pela SEFAZ.
 
-    Business.certificate_file → FileField (upload_to='certificates/')
-    Business.certificate_password → CharField
-
-    Retorna (pfx_bytes, senha_str)
+    Algoritmos:
+      Canonicalização : C14N  (http://www.w3.org/TR/2001/REC-xml-c14n-20010315)
+      Transformações  : Enveloped-Signature + C14N
+      Digest          : SHA-1  (exigido pelo leiaute NF-e 4.00)
+      Assinatura      : RSA-SHA1
     """
-    if not business.certificate_file:
-        raise ValueError(
-            f'Empresa "{business.name}" não possui certificado digital cadastrado. '
-            'Acesse Empresa → Editar e faça o upload do arquivo .pfx'
-        )
+    import base64
+    import hashlib
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives.serialization import Encoding
+    from core.services.fiscal.certificate_utils import carregar_pkcs12
 
-    # Lê o arquivo do storage (funciona com FileField local e S3)
-    cert_file = business.certificate_file
-    cert_file.seek(0)
-    pfx_data = cert_file.read()
+    privkey, cert, _chain = carregar_pkcs12(pfx_bytes, senha)
+    cert_der = cert.public_bytes(Encoding.DER)
 
-    senha = business.certificate_password or ''
+    root = etree.fromstring(xml_bytes)
 
-    return pfx_data, senha
+    # Localiza a tag com Id=ref_id
+    tag_ref = None
+    for el in root.iter():
+        if el.get('Id') == ref_id:
+            tag_ref = el
+            break
+    if tag_ref is None:
+        raise ValueError(f'Tag com Id="{ref_id}" não encontrada no XML.')
+
+    # C14N da tag referenciada → DigestValue (SHA-1)
+    c14n_bytes = etree.tostring(tag_ref, method='c14n', exclusive=False, with_comments=False)
+    digest_b64 = base64.b64encode(hashlib.sha1(c14n_bytes).digest()).decode()
+
+    # Monta <SignedInfo>
+    signed_info_xml = (
+        f'<SignedInfo xmlns="{_NS_DS}">'
+        f'<CanonicalizationMethod Algorithm="{_NS_C14N}"/>'
+        f'<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>'
+        f'<Reference URI="#{ref_id}">'
+        f'<Transforms>'
+        f'<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>'
+        f'<Transform Algorithm="{_NS_C14N}"/>'
+        f'</Transforms>'
+        f'<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>'
+        f'<DigestValue>{digest_b64}</DigestValue>'
+        f'</Reference>'
+        f'</SignedInfo>'
+    )
+    signed_info_el = etree.fromstring(signed_info_xml.encode())
+
+    # C14N do <SignedInfo> → assina RSA-SHA1
+    si_c14n = etree.tostring(signed_info_el, method='c14n', exclusive=False, with_comments=False)
+    sig_b64 = base64.b64encode(
+        privkey.sign(si_c14n, padding.PKCS1v15(), hashes.SHA1())
+    ).decode()
+
+    # Injeta <Signature> na tag referenciada
+    cert_b64 = base64.b64encode(cert_der).decode()
+    tag_ref.append(etree.fromstring((
+        f'<Signature xmlns="{_NS_DS}">'
+        + signed_info_xml
+        + f'<SignatureValue>{sig_b64}</SignatureValue>'
+        f'<KeyInfo><X509Data>'
+        f'<X509Certificate>{cert_b64}</X509Certificate>'
+        f'</X509Data></KeyInfo>'
+        f'</Signature>'
+    ).encode()))
+
+    return etree.tostring(root, encoding='unicode', xml_declaration=False)
 
 
 def assinar_xml(invoice, xml_str: str) -> str:
-    """
-    Assina digitalmente o XML usando o certificado A1 da empresa.
+    """Assina digitalmente o XML de uma NF-e ou NFC-e."""
+    from core.services.fiscal.certificate_utils import ler_pfx
 
-    Args:
-        invoice:  instância de core.Invoice
-        xml_str:  XML não assinado gerado por xml_builder.build_xml()
-
-    Returns:
-        str: XML assinado digitalmente
-
-    Raises:
-        ValueError: certificado não cadastrado ou senha inválida
-        Exception:  erros de assinatura (certificado vencido, etc.)
-    """
-    from nfelib.nfe.bindings.v4_0 import nfe_v4_00 as nfe_schema
-
-    business = invoice.order.business
-    pfx_data, senha = _carregar_certificado(business)
-
-    # ID da tag a ser assinada: infNFe para NF-e/NFC-e
+    pfx_bytes, senha = ler_pfx(invoice.order.business)
     inf_id = f'NFe{invoice.access_key}'
 
     try:
-        # nfelib 2.3 expõe sign_xml diretamente no módulo de bindings
-        # Carrega o objeto a partir do XML string para usar o método sign_xml
-        nfe_obj = nfe_schema.TNFe.from_xml(xml_str.encode())
-
-        xml_assinado = nfe_obj.sign_xml(
-            xml_str.encode(),
-            pfx_data,
-            senha,
-            inf_id,
+        return _assinar(
+            xml_str.encode() if isinstance(xml_str, str) else xml_str,
+            pfx_bytes, senha, inf_id,
         )
-
-        # Retorna como string
-        if isinstance(xml_assinado, bytes):
-            return xml_assinado.decode('utf-8')
-        return xml_assinado
-
     except Exception as e:
         raise Exception(
             f'Erro ao assinar XML da NF {invoice.serie}/{invoice.number}: {str(e)}\n'
@@ -89,51 +112,18 @@ def assinar_xml(invoice, xml_str: str) -> str:
         ) from e
 
 
-def validar_certificado(business) -> dict:
-    """
-    Valida o certificado digital cadastrado na empresa.
-
-    Returns:
-        dict com: valido (bool), expiracao (date), cnpj (str), mensagem (str)
-    """
-    from cryptography.hazmat.primitives.serialization import pkcs12
-    from cryptography.hazmat.backends import default_backend
-    from datetime import date
-
+def assinar_xml_evento(pfx_bytes: bytes, senha: str, evento_xml: str, id_evento: str) -> str:
+    """Assina digitalmente o XML de um evento (cancelamento, CCe, etc.)."""
     try:
-        pfx_data, senha = _carregar_certificado(business)
-        senha_bytes = senha.encode() if isinstance(senha, str) else senha
-
-        privkey, cert, _ = pkcs12.load_key_and_certificates(
-            pfx_data, senha_bytes, backend=default_backend()
+        return _assinar(
+            evento_xml.encode() if isinstance(evento_xml, str) else evento_xml,
+            pfx_bytes, senha, id_evento,
         )
-
-        expiracao  = cert.not_valid_after.date()
-        subject    = cert.subject
-        cn         = subject.get_attributes_for_oid(
-            __import__('cryptography.x509.oid', fromlist=['NameOID']).NameOID.COMMON_NAME
-        )
-        nome_cert  = cn[0].value if cn else 'N/A'
-        hoje       = date.today()
-        dias_restantes = (expiracao - hoje).days
-
-        return {
-            'valido':          dias_restantes > 0,
-            'expiracao':       expiracao,
-            'dias_restantes':  dias_restantes,
-            'nome':            nome_cert,
-            'mensagem': (
-                f'Certificado válido até {expiracao.strftime("%d/%m/%Y")} '
-                f'({dias_restantes} dias restantes)'
-                if dias_restantes > 0
-                else f'Certificado VENCIDO em {expiracao.strftime("%d/%m/%Y")}'
-            )
-        }
-
-    except ValueError as e:
-        return {'valido': False, 'mensagem': str(e)}
     except Exception as e:
-        return {
-            'valido':   False,
-            'mensagem': f'Erro ao ler certificado: {str(e)}'
-        }
+        raise Exception(f'Erro ao assinar evento {id_evento}: {str(e)}') from e
+
+
+def validar_certificado(business) -> dict:
+    """Valida o certificado. Delega ao diagnosticar_certificado."""
+    from core.services.fiscal.certificate_utils import diagnosticar_certificado
+    return diagnosticar_certificado(business)

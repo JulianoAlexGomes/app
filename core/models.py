@@ -5,9 +5,39 @@ from django.contrib.auth.models import AbstractUser
 from datetime import timedelta
 from django.utils import timezone
 
+# class Plan(models.Model):
+#     name = models.CharField(max_length=100)
+#     price = models.DecimalField(max_digits=10, decimal_places=2)
+#     max_users = models.PositiveIntegerField(default=1, help_text='Máximo de usuários por empresa')
+#     active = models.BooleanField(default=True)
+
+#     def __str__(self):
+#         return self.name
+
 class Plan(models.Model):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # Limites
+    max_users = models.PositiveIntegerField(default=1)
+    max_products = models.PositiveIntegerField(default=0, help_text="0 = ilimitado")
+    max_nfe_per_month = models.PositiveIntegerField(default=0, help_text="0 = ilimitado")
+    max_nfce_per_month = models.PositiveIntegerField(default=0, help_text="0 = ilimitado")
+    storage_gb = models.PositiveIntegerField(default=1)
+
+    # Recursos
+    has_inventory_control = models.BooleanField(default=True)
+    has_financial_control = models.BooleanField(default=True)
+    has_cash_flow = models.BooleanField(default=False)
+    has_dre = models.BooleanField(default=False)
+    has_api_access = models.BooleanField(default=False)
+    has_multi_company = models.BooleanField(default=False)
+    has_user_permissions = models.BooleanField(default=False)
+    has_marketplace_integration = models.BooleanField(default=False)
+    has_audit_logs = models.BooleanField(default=False)
+    has_priority_support = models.BooleanField(default=False)
+    description = models.TextField(blank=True)
+
     active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -793,6 +823,9 @@ class FinancialMovement(models.Model):
     total_value = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.CharField(max_length=255)
     timestamp = models.DateTimeField(auto_now_add=True)
+    expense_type = models.IntegerField(max_length=10,
+        choices=[(1, 'Variavel'), (2, 'Fixa')]
+        )
 
     def __str__(self):
         return f"{self.description} - {self.total_value}"

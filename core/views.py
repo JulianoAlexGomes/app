@@ -5,9 +5,11 @@ from .models import *
 from django.contrib.auth.views import LoginView, LogoutView
 from .forms import (
     ClientForm, SizechartForm, SizesFormSet, colorchartForm, modelchartForm,
-    ProductForm, StockEntryForm, OrderForm, OrderItemFormSet, ProductImageFormSet,
-    PaymentMethodForm, BankAccountForm, FinancialMovementForm, FinancialParcelFormSet,
-    ParcelPayForm, OrderPaymentFormSet, FiscalOperationForm, OrderPaymentParcelFormSet
+    ProductForm, StockEntryForm, OrderForm, OrderItemFormSet, PaymentMethodForm,
+    BankAccountForm, FinancialMovementForm, FinancialParcelFormSet, ParcelPayForm,
+    OrderPaymentFormSet, FiscalOperationForm, OrderPaymentParcelFormSet,
+    CustomUserCreationForm, CustomUserChangeForm,
+    AdminBusinessForm, AdminUserCreateForm, AdminUserChangeForm, AdminPlanForm,  # ← adicione esta linha
 )
 from django.shortcuts import redirect, get_object_or_404
 from django.core.paginator import Paginator
@@ -28,6 +30,249 @@ from .models import Client, Orders, Product, FinancialMovement, FinancialMovemen
 import calendar
 from core.services.nf_generator import gerar_nota_fiscal
 from core.models import Invoice, InvoiceStatus
+from django.views.generic import (
+    ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView  # ← TemplateView aqui
+)
+
+# Staff
+
+from .mixins import SaasAdminMixin
+
+# ══════════════════════════════════════════════
+# DASHBOARD
+# ══════════════════════════════════════════════
+class SaasDashboardView(SaasAdminMixin, TemplateView):
+    template_name = 'saas/dashboard.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['total_businesses'] = Business.objects.count()
+        ctx['total_users']      = User.objects.filter(is_staff=False).count()
+        ctx['total_plans']      = Plan.objects.filter(active=True).count()
+        ctx['recent_businesses'] = Business.objects.select_related('plan').order_by('-created_at')[:8]
+        return ctx
+
+
+# ══════════════════════════════════════════════
+# PLANOS
+# ══════════════════════════════════════════════
+class SaasPlanListView(SaasAdminMixin, ListView):
+    model               = Plan
+    template_name       = 'saas/plan/list.html'
+    context_object_name = 'plans'
+    ordering            = ['price']
+
+
+class SaasPlanCreateView(SaasAdminMixin, CreateView):
+    model         = Plan
+    form_class    = AdminPlanForm
+    template_name = 'saas/plan/form.html'
+    success_url   = reverse_lazy('saas_plan_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Plano criado com sucesso.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Novo Plano'
+        return ctx
+
+
+class SaasPlanUpdateView(SaasAdminMixin, UpdateView):
+    model         = Plan
+    form_class    = AdminPlanForm
+    template_name = 'saas/plan/form.html'
+    success_url   = reverse_lazy('saas_plan_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Plano atualizado com sucesso.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Editar Plano'
+        return ctx
+
+
+class SaasPlanDeleteView(SaasAdminMixin, DeleteView):
+    model         = Plan
+    template_name = 'saas/plan/delete.html'
+    success_url   = reverse_lazy('saas_plan_list')
+
+    def post(self, request, *args, **kwargs):
+        messages.success(request, '✅ Plano excluído.')
+        return super().post(request, *args, **kwargs)
+
+
+# ══════════════════════════════════════════════
+# EMPRESAS
+# ══════════════════════════════════════════════
+class SaasBusinessListView(SaasAdminMixin, ListView):
+    model               = Business
+    template_name       = 'saas/business/list.html'
+    context_object_name = 'businesses'
+    paginate_by         = 20
+
+    def get_queryset(self):
+        qs = Business.objects.select_related('plan').order_by('-created_at')
+        q  = self.request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q) |
+                Q(document__icontains=q) |
+                Q(fantasy_name__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['search'] = self.request.GET.get('q', '')
+        return ctx
+
+
+class SaasBusinessCreateView(SaasAdminMixin, CreateView):
+    model         = Business
+    form_class    = AdminBusinessForm
+    template_name = 'saas/business/form.html'
+    success_url   = reverse_lazy('saas_business_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Empresa criada com sucesso.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Nova Empresa'
+        return ctx
+
+
+class SaasBusinessUpdateView(SaasAdminMixin, UpdateView):
+    model         = Business
+    form_class    = AdminBusinessForm
+    template_name = 'saas/business/form.html'
+    success_url   = reverse_lazy('saas_business_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Empresa atualizada com sucesso.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Editar Empresa'
+        return ctx
+
+
+class SaasBusinessDeleteView(SaasAdminMixin, DeleteView):
+    model         = Business
+    template_name = 'saas/business/delete.html'
+    success_url   = reverse_lazy('saas_business_list')
+
+    def post(self, request, *args, **kwargs):
+        messages.success(request, '✅ Empresa excluída.')
+        return super().post(request, *args, **kwargs)
+
+
+# ══════════════════════════════════════════════
+# USUÁRIOS DA EMPRESA  (visão do SaaS admin)
+# ══════════════════════════════════════════════
+class SaasUserListView(SaasAdminMixin, ListView):
+    model               = User
+    template_name       = 'saas/user/list.html'
+    context_object_name = 'users'
+    paginate_by         = 20
+
+    def get_queryset(self):
+        # Lista usuários de UMA empresa específica
+        self.business = get_object_or_404(Business, pk=self.kwargs['business_pk'])
+        return User.objects.filter(business=self.business).order_by('username')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['business'] = self.business
+        plan = self.business.plan
+        ctx['max_users']  = plan.max_users if plan else '—'
+        ctx['total_users'] = User.objects.filter(business=self.business).count()
+        return ctx
+
+
+class SaasUserCreateView(SaasAdminMixin, CreateView):
+    model         = User
+    form_class    = AdminUserCreateForm
+    template_name = 'saas/user/form.html'
+
+    def get_success_url(self):
+        return reverse_lazy('saas_user_list', kwargs={'business_pk': self.kwargs['business_pk']})
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['business'] = get_object_or_404(Business, pk=self.kwargs['business_pk'])
+        ctx['title']    = 'Novo Usuário'
+        return ctx
+
+    def form_valid(self, form):
+        business      = get_object_or_404(Business, pk=self.kwargs['business_pk'])
+
+        # Valida limite do plano
+        plan      = business.plan
+        max_users = plan.max_users if plan else 1
+        total     = User.objects.filter(business=business).count()
+        if total >= max_users:
+            form.add_error(None, f'Limite de {max_users} usuário(s) atingido para este plano.')
+            return self.form_invalid(form)
+
+        user          = form.save(commit=False)
+        user.business = business
+        user.plan     = plan
+        user.save()
+        messages.success(self.request, f'✅ Usuário {user.username} criado com sucesso.')
+        return redirect(self.get_success_url())
+
+
+class SaasUserUpdateView(SaasAdminMixin, UpdateView):
+    model         = User
+    form_class    = AdminUserChangeForm
+    template_name = 'saas/user/form.html'
+
+    def get_queryset(self):
+        self.business = get_object_or_404(Business, pk=self.kwargs['business_pk'])
+        return User.objects.filter(business=self.business)
+
+    def get_success_url(self):
+        return reverse_lazy('saas_user_list', kwargs={'business_pk': self.kwargs['business_pk']})
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['business'] = self.business
+        ctx['title']    = 'Editar Usuário'
+        return ctx
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Usuário atualizado.')
+        return super().form_valid(form)
+
+
+class SaasUserDeleteView(SaasAdminMixin, DeleteView):
+    model         = User
+    template_name = 'saas/user/delete.html'
+
+    def get_queryset(self):
+        self.business = get_object_or_404(Business, pk=self.kwargs['business_pk'])
+        return User.objects.filter(business=self.business)
+
+    def get_success_url(self):
+        return reverse_lazy('saas_user_list', kwargs={'business_pk': self.kwargs['business_pk']})
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['business'] = self.business
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        messages.success(request, '✅ Usuário excluído.')
+        return super().post(request, *args, **kwargs)
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HOME / DASHBOARD
@@ -1314,6 +1559,56 @@ def financial_history(request):
 
     return render(request, 'financial/history.html', {'history': history})
 
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
+from django.db import transaction
+
+@login_required
+@transaction.atomic
+def financial_replicate(request, pk):
+    business = request.user.business
+    movement = get_object_or_404(FinancialMovement, pk=pk, business=business)
+
+    # Só permite replicar se for Saída e Fixa
+    if movement.type != 'out' or movement.expense_type != 2:
+        messages.error(request, 'Somente despesas fixas podem ser replicadas.')
+        return redirect('financial_list')
+
+    if request.method == 'POST':
+        months = int(request.POST.get('months', 1))
+
+        for i in range(1, months + 1):
+            # Clona movimento
+            new_movement = FinancialMovement.objects.create(
+                business=movement.business,
+                client=movement.client,
+                order=None,
+                bank=movement.bank,
+                payment_method=movement.payment_method,
+                type=movement.type,
+                expense_type=movement.expense_type,
+                total_value=movement.total_value,
+                description=movement.description,
+                # ❌ Removido: parent_movement=movement,
+                # ❌ Removido: is_replicated=True,
+            )
+
+            # Clona parcelas
+            for parcel in movement.parcels.all():
+                new_deadline = parcel.deadline + relativedelta(months=i)
+
+                parcel.pk = None  # ⚠️ força criação de novo registro
+                parcel.movement = new_movement
+                parcel.deadline = new_deadline
+                parcel.payed = False
+                parcel.save()
+
+        messages.success(request, f'{months} lançamentos replicados com sucesso.')
+        return redirect('financial_list')
+
+    return render(request, 'financial/replicate.html', {
+        'movement': movement
+    })
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FORMAS DE PAGAMENTO
@@ -1422,11 +1717,20 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Business
 from .forms import BusinessForm
 
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
+from django.urls import reverse_lazy, reverse
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+
+from core.models import Business
+from core.forms import BusinessForm
+from core.services.fiscal.certificate_utils import encrypt_password, is_password_encrypted
+
 
 class BusinessListView(LoginRequiredMixin, ListView):
-    model                = Business
-    template_name        = 'business/list.html'
-    context_object_name  = 'businesses'
+    model               = Business
+    template_name       = 'business/list.html'
+    context_object_name = 'businesses'
 
 
 class BusinessCreateView(LoginRequiredMixin, CreateView):
@@ -1435,6 +1739,20 @@ class BusinessCreateView(LoginRequiredMixin, CreateView):
     template_name = 'business/form.html'
     success_url   = reverse_lazy('business_list')
 
+    def form_valid(self, form):
+        business = form.save(commit=False)
+
+        # Criptografa a senha do certificado se foi informada
+        senha = form.cleaned_data.get('certificate_password', '')
+        if senha:
+            business.certificate_password = encrypt_password(senha)
+        else:
+            business.certificate_password = ''
+
+        business.save()
+        messages.success(self.request, 'Empresa criada com sucesso!')
+        return super(CreateView, self).form_valid(form)  # pula o save() duplo
+
 
 class BusinessUpdateView(LoginRequiredMixin, UpdateView):
     model         = Business
@@ -1442,8 +1760,24 @@ class BusinessUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'business/form.html'
 
     def form_valid(self, form):
+        business = form.save(commit=False)
+
+        senha_digitada = form.cleaned_data.get('certificate_password', '')
+
+        if senha_digitada:
+            # Usuário digitou uma nova senha → criptografa e salva
+            if not is_password_encrypted(senha_digitada):
+                business.certificate_password = encrypt_password(senha_digitada)
+            else:
+                # Já veio criptografada (improvável, mas protege)
+                business.certificate_password = senha_digitada
+        else:
+            # Campo em branco → mantém a senha que já está no banco
+            business.certificate_password = Business.objects.get(pk=business.pk).certificate_password
+
+        business.save()
         messages.success(self.request, 'Empresa alterada com sucesso!')
-        return super().form_valid(form)
+        return super(UpdateView, self).form_valid(form)  # pula o save() duplo
 
     def get_success_url(self):
         return reverse('business_update', kwargs={'pk': self.object.pk})
@@ -1453,15 +1787,9 @@ class BusinessDeleteView(LoginRequiredMixin, DeleteView):
     model         = Business
     template_name = 'business/confirm_delete.html'
     success_url   = reverse_lazy('business_list')
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # USUÁRIOS
 # ─────────────────────────────────────────────────────────────────────────────
-
-from .models import User
-from .forms import CustomUserCreationForm
-
 
 class UserListView(LoginRequiredMixin, ListView):
     model               = User
@@ -1469,7 +1797,32 @@ class UserListView(LoginRequiredMixin, ListView):
     context_object_name = 'users'
 
     def get_queryset(self):
-        return User.objects.filter(business=self.request.user.business)
+        qs = User.objects.filter(business=self.request.user.business)
+        q  = self.request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                models.Q(username__icontains=q) |
+                models.Q(first_name__icontains=q) |
+                models.Q(last_name__icontains=q) |
+                models.Q(email__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx      = super().get_context_data(**kwargs)
+        business = self.request.user.business
+        plan     = business.plan
+
+        total        = User.objects.filter(business=business).count()
+        max_users    = plan.max_users if plan else 1
+
+        ctx['total_users']      = total
+        ctx['max_users']        = max_users
+        ctx['slots_used']       = total
+        ctx['can_add']          = total < max_users
+        ctx['users_with_email'] = User.objects.filter(business=business).exclude(email='').exclude(email=None).count()
+        ctx['search']           = self.request.GET.get('q', '')
+        return ctx
 
 
 class UserCreateView(LoginRequiredMixin, CreateView):
@@ -1478,12 +1831,66 @@ class UserCreateView(LoginRequiredMixin, CreateView):
     template_name = 'users/form.html'
     success_url   = reverse_lazy('user_list')
 
+    def dispatch(self, request, *args, **kwargs):
+        business  = request.user.business
+        plan      = business.plan
+        max_users = plan.max_users if plan else 1
+        total     = User.objects.filter(business=business).count()
+
+        if total >= max_users:
+            messages.error(
+                request,
+                f'Seu plano permite no máximo {max_users} usuário(s). '
+                f'Faça upgrade para adicionar mais.'
+            )
+            return redirect('user_list')
+
+        return super().dispatch(request, *args, **kwargs)
+
     def form_valid(self, form):
         user          = form.save(commit=False)
         user.business = self.request.user.business
         user.plan     = self.request.user.business.plan
         user.save()
+        messages.success(self.request, '✅ Usuário criado com sucesso.')
         return super().form_valid(form)
+
+
+class UserUpdateView(LoginRequiredMixin, UpdateView):
+    model         = User
+    form_class    = CustomUserChangeForm  # veja item 3
+    template_name = 'users/form.html'
+    success_url   = reverse_lazy('user_list')
+
+    def get_queryset(self):
+        # Empresa só edita seus próprios usuários
+        return User.objects.filter(business=self.request.user.business)
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Usuário atualizado com sucesso.')
+        return super().form_valid(form)
+
+
+class UserDeleteView(LoginRequiredMixin, DeleteView):
+    model        = User
+    template_name = 'users/delete.html'
+    success_url  = reverse_lazy('user_list')
+
+    def get_queryset(self):
+        # Empresa só exclui seus próprios usuários
+        return User.objects.filter(business=self.request.user.business)
+
+    def dispatch(self, request, *args, **kwargs):
+        # Impede que o usuário exclua a si mesmo
+        obj = self.get_object()
+        if obj == request.user:
+            messages.error(request, 'Você não pode excluir seu próprio usuário.')
+            return redirect('user_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        messages.success(request, '✅ Usuário excluído com sucesso.')
+        return super().post(request, *args, **kwargs)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

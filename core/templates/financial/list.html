@@ -267,6 +267,16 @@ th.actions-col, td.actions-col { width: 110px; text-align: center; }
                class="btn-icon btn-edit" title="Editar">
                 <i class="bi bi-pencil"></i>
             </a>
+        <!-- 🔁 Replicar (APENAS DESPESA FIXA) -->
+            {% if parcel.movement.expense_type == 2 %}
+            <a href="{% url 'financial_replicate' parcel.movement.id %}"
+            class="btn-icon"
+            title="Replicar despesa fixa"
+            style="border-color:#6f42c1; color:#6f42c1;">
+                <i class="bi bi-arrow-repeat"></i>
+            </a>
+        {% endif %}
+            
 
             {% if not parcel.payed %}
             {# ── Baixar ── #}

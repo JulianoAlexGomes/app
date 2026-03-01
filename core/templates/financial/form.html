@@ -57,6 +57,16 @@
                     {% if form.type.errors %}<div class="text-danger small mt-1">{{ form.type.errors }}</div>{% endif %}
                 </div>
 
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Tipo de Despesa</label>
+                    {{ form.expense_type }}
+                    {% if form.expense_type.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.expense_type.errors }}
+                        </div>
+                    {% endif %}
+                </div>
+
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Cliente / Fornecedor</label>
                     {{ form.client }}

@@ -1,8 +1,83 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Client, Sizechart, colorchart, modelchart, Product, StockEntry, Orders, OrderItem, ProductImage, Sizes, ProductVariant, FinancialMovement, FinancialMovementParcel, PaymentMethod, BankAccount, OrderPayment, OrderPaymentParcel, Business
+from .models import Client, Sizechart, colorchart, modelchart, Product, StockEntry, Orders, OrderItem, ProductImage, Sizes, ProductVariant, FinancialMovement, FinancialMovementParcel, PaymentMethod, BankAccount, OrderPayment, OrderPaymentParcel, Business, Plan, User
 from django.forms import inlineformset_factory
 from django.core.exceptions import ValidationError
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+
+class AdminBusinessForm(forms.ModelForm):
+    class Meta:
+        model  = Business
+        fields = [
+            'name', 'fantasy_name', 'document',
+            'state_registration', 'municipal_registration',
+            'tax_regime',
+            'street', 'number', 'complement', 'district',
+            'city', 'city_code', 'state', 'zip_code', 'phone',
+            'nfe_environment', 'nfe_series', 'nfce_series',
+            'plan', 'active',
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['plan'].queryset = Plan.objects.filter(active=True)
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.Select):
+                field.widget.attrs['class'] = 'form-select'
+            elif isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs['class'] = 'form-check-input'
+            else:
+                field.widget.attrs['class'] = 'form-control'
+
+class AdminUserCreateForm(UserCreationForm):
+    """Cria usuário já vinculado a uma empresa."""
+
+    class Meta:
+        model  = User
+        fields = [
+            'username', 'first_name', 'last_name',
+            'email', 'role', 'password1', 'password2',
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.Select):
+                field.widget.attrs['class'] = 'form-select'
+            else:
+                field.widget.attrs['class'] = 'form-control'
+
+class AdminUserChangeForm(forms.ModelForm):
+    """Edita usuário sem redefinir senha."""
+
+    class Meta:
+        model  = User
+        fields = ['username', 'first_name', 'last_name', 'email', 'role', 'is_active']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.Select):
+                field.widget.attrs['class'] = 'form-select'
+            elif isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs['class'] = 'form-check-input'
+            else:
+                field.widget.attrs['class'] = 'form-control'
+
+
+class AdminPlanForm(forms.ModelForm):
+    class Meta:
+        model  = Plan
+        fields = ['name', 'price', 'max_users', 'active']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs['class'] = 'form-check-input'
+            else:
+                field.widget.attrs['class'] = 'form-control'
+
 
 UF_CHOICES = [
     ('', 'Selecione'),
@@ -393,6 +468,7 @@ class FinancialMovementForm(forms.ModelForm):
         fields = [
             'client',
             'type',
+            'expense_type',
             'payment_method',
             'bank',
             'total_value',
@@ -402,11 +478,11 @@ class FinancialMovementForm(forms.ModelForm):
             'description': forms.TextInput(attrs={'class': 'form-control'}),
             'total_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'type': forms.Select(attrs={'class': 'form-select'}),
+            'expense_type': forms.Select(attrs={'class': 'form-select'}),
             'payment_method': forms.Select(attrs={'class': 'form-select'}),
             'bank': forms.Select(attrs={'class': 'form-select'}),
             'client': forms.Select(attrs={'class': 'form-select'}),
         }
-
 
 class FinancialParcelForm(forms.ModelForm):
     class Meta:
@@ -425,7 +501,6 @@ class FinancialParcelForm(forms.ModelForm):
             'addition': forms.NumberInput(attrs={'class': 'form-control'}),
             'deadline': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
-
 
 FinancialParcelFormSet = inlineformset_factory(
     FinancialMovement,
@@ -639,7 +714,6 @@ class BusinessForm(forms.ModelForm):
             'uid',
             'created_at',
             'country_code',
-            'plan',
         )
 
         widgets = {
@@ -939,3 +1013,24 @@ InvoicePaymentFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from django import forms
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta:
+        model  = User
+        fields = [
+            'username', 'first_name', 'last_name',
+            'email', 'role', 'password1', 'password2',
+        ]
+
+
+class CustomUserChangeForm(forms.ModelForm):
+    """Edição sem redefinir senha — senha tem fluxo próprio."""
+    class Meta:
+        model  = User
+        fields = [
+            'username', 'first_name', 'last_name',
+            'email', 'role',
+        ]

@@ -1,0 +1,39 @@
+{% extends 'base/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="container mt-4" style="max-width:480px;">
+    <div class="mb-4">
+        <a href="{% url 'saas_plan_list' %}" class="text-muted small text-decoration-none">
+            <i class="bi bi-arrow-left me-1"></i> Planos
+        </a>
+        <h4 class="fw-bold mb-0 mt-1">{{ title }}</h4>
+    </div>
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="mb-3">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="form-check">
+                            {{ field }}
+                            <label class="form-check-label fw-semibold">{{ field.label }}</label>
+                        </div>
+                    {% else %}
+                        <label class="form-label fw-semibold">{{ field.label }}</label>
+                        {{ field }}
+                    {% endif %}
+                    {% if field.errors %}
+                        <div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary px-4">Salvar</button>
+                    <a href="{% url 'saas_plan_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends 'base/base.html' %}
+{% block title %}Empresas{% endblock %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+.card-saas { border:none; border-radius:14px; box-shadow:0 4px 20px rgba(0,0,0,.06); }
+.btn-icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid #dee2e6; background:#fff; transition:.2s; text-decoration:none; color:inherit; }
+.btn-icon:hover { transform:scale(1.05); }
+</style>
+
+<div class="container-fluid mt-4 px-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="{% url 'saas_dashboard' %}" class="text-muted small text-decoration-none">
+                <i class="bi bi-arrow-left me-1"></i> Painel
+            </a>
+            <h4 class="fw-bold mb-0 mt-1">Empresas</h4>
+        </div>
+        <a href="{% url 'saas_business_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Nova Empresa
+        </a>
+    </div>
+
+    <!-- BUSCA -->
+    <div class="card card-saas mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <input type="text" name="q" value="{{ search }}"
+                           class="form-control" placeholder="Buscar por nome, fantasia ou CNPJ...">
+                </div>
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-primary"><i class="bi bi-search"></i></button>
+                    <a href="{% url 'saas_business_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card card-saas">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Empresa</th>
+                        <th>CNPJ</th>
+                        <th>Plano</th>
+                        <th>Usuários</th>
+                        <th>Ambiente</th>
+                        <th>Status</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for b in businesses %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ b.name }}</div>
+                        <small class="text-muted">{{ b.fantasy_name|default:"" }}</small>
+                    </td>
+                    <td class="text-muted small">{{ b.document }}</td>
+                    <td>
+                        {% if b.plan %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary">{{ b.plan.name }}</span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'saas_user_list' b.pk %}" class="text-decoration-none">
+                            {{ b.users.count }}
+                            {% if b.plan %}<span class="text-muted">/ {{ b.plan.max_users }}</span>{% endif %}
+                        </a>
+                    </td>
+                    <td>
+                        {% if b.nfe_environment == 1 %}
+                            <span class="badge bg-success">Produção</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Homologação</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if b.active %}
+                            <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex justify-content-center gap-2">
+                            <a href="{% url 'saas_user_list' b.pk %}"
+                               class="btn-icon" title="Usuários">
+                                <i class="bi bi-people"></i>
+                            </a>
+                            <a href="{% url 'saas_business_update' b.pk %}"
+                               class="btn-icon" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'saas_business_delete' b.pk %}"
+                               class="btn-icon" title="Excluir"
+                               style="border-color:#dc3545; color:#dc3545;">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma empresa encontrada.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+        <div class="card-footer bg-white border-0">
+            <nav>
+                <ul class="pagination pagination-sm mb-0 justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
